@@ -14,7 +14,7 @@ import {
   Plus,
   X
 } from "lucide-react";
-import { AC_BRANDS } from "@/constants/enums";
+import { AC_BRANDS, AC_BRAND_LABELS } from "@/constants/enums";
 
 export default function AllRoomsPage() {
   const { user, getToken } = useAuth();
@@ -642,7 +642,7 @@ export default function AllRoomsPage() {
                     >
                       {Object.values(AC_BRANDS).map((brand) => (
                         <option key={brand} value={brand} className="bg-white text-slate-700">
-                          {brand}
+                          {AC_BRAND_LABELS[brand] || brand}
                         </option>
                       ))}
                     </select>

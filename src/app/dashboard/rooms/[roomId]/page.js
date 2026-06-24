@@ -19,7 +19,7 @@ import {
   Minus,
   Plus
 } from "lucide-react";
-import { AC_BRANDS } from "@/constants/enums";
+import { AC_BRANDS, AC_BRAND_LABELS } from "@/constants/enums";
 
 const AC_MODES = ["cool", "heat", "fan", "auto", "dry"];
 const FAN_SPEEDS = ["auto", "low", "medium", "high"];
@@ -710,7 +710,7 @@ export default function RoomControlPage() {
               <span className={`w-1.5 h-1.5 rounded-full ${room?.deviceStatus === "online" ? "bg-green-500 animate-pulse" : "bg-red-500"}`} />
             </div>
             <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 mt-0.5">
-              {selectedBrand || "VOLTAS"} AC
+              {AC_BRAND_LABELS[selectedBrand] || selectedBrand || "VOLTAS"} AC
             </span>
           </div>
 
@@ -1005,11 +1005,11 @@ export default function RoomControlPage() {
                 <select
                   value={editAcBrand}
                   onChange={(e) => setEditAcBrand(e.target.value)}
-                  className="bg-[#F5F5F7] border border-slate-200/60 text-slate-905 rounded-2xl p-3 w-full text-xs font-semibold mt-1 focus:outline-none focus:border-[#FF6B35]/50 cursor-pointer capitalize"
+                  className="bg-[#F5F5F7] border border-slate-200/60 text-slate-905 rounded-2xl p-3 w-full text-xs font-semibold mt-1 focus:outline-none focus:border-[#FF6B35]/50 cursor-pointer"
                 >
                   {Object.keys(AC_BRANDS).map((b) => (
                     <option key={b} value={b} className="bg-white text-slate-850">
-                      {b}
+                      {AC_BRAND_LABELS[b] || b}
                     </option>
                   ))}
                 </select>
