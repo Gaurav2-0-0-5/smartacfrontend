@@ -13,11 +13,13 @@ import {
   Fan,
   Menu,
   ChevronDown,
+  ArrowLeft,
   X,
   Cpu,
   Trash2,
   Minus,
-  Plus
+  Plus,
+  WifiOff
 } from "lucide-react";
 import { AC_BRANDS, AC_BRAND_LABELS } from "@/constants/enums";
 
@@ -62,6 +64,7 @@ export default function RoomControlPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const dialRef = useRef(null);
+  const lastInteractionRef = useRef(0);
 
   useEffect(() => {
     if (room) {
@@ -300,6 +303,16 @@ export default function RoomControlPage() {
       setCurrentTemp(updated.currentTemp ?? currentTemp);
       setDeviceId(updated.deviceId || "");
 
+      // Safely sync control states when the user is not actively interacting
+      if (!actionLoading && (Date.now() - lastInteractionRef.current > 4000)) {
+        if (updated.targetTemp !== undefined) setTargetTemp(updated.targetTemp);
+        if (updated.mode !== undefined) setMode(updated.mode);
+        if (updated.fanSpeed !== undefined) setFanSpeed(updated.fanSpeed);
+        if (updated.swing !== undefined) setSwing(updated.swing);
+        if (updated.power !== undefined) setPower(updated.power);
+        if (updated.acBrand !== undefined) setSelectedBrand(updated.acBrand);
+      }
+
       // Update connection status passively (don't override user commands)
       if (updated.deviceStatus !== undefined) {
         setRoom(prev => prev ? { ...prev, deviceStatus: updated.deviceStatus } : prev);
@@ -307,7 +320,7 @@ export default function RoomControlPage() {
     } catch {
       // Silent — don't surface polling errors to the user
     }
-  }, [parentPropertyId, parentFloorId, roomId, getToken, apiUrl, currentTemp]);
+  }, [parentPropertyId, parentFloorId, roomId, getToken, apiUrl, currentTemp, actionLoading]);
 
   useEffect(() => {
     if (!parentPropertyId || !parentFloorId) return;
@@ -325,12 +338,15 @@ export default function RoomControlPage() {
 
   const [logs, setLogs] = useState([]);
   const [mqttConnected, setMqttConnected] = useState(false);
-  const logEndRef = useRef(null);
+  const logContainerRef = useRef(null);
   const mqttClientRef = useRef(null);
 
   useEffect(() => {
-    if (logEndRef.current) {
-      logEndRef.current.scrollIntoView({ behavior: "smooth" });
+    if (logContainerRef.current) {
+      logContainerRef.current.scrollTo({
+        top: logContainerRef.current.scrollHeight,
+        behavior: "smooth"
+      });
     }
   }, [logs]);
 
@@ -430,6 +446,7 @@ export default function RoomControlPage() {
   // =========================================================================
   
   const sendCommand = async (action, value, brandParam) => {
+    lastInteractionRef.current = Date.now();
     if (!parentPropertyId || !roomId) {
       setError("Device coordination details hydrating...");
       return;
@@ -556,6 +573,7 @@ export default function RoomControlPage() {
   const thumbY = centerY - radius * Math.sin(angleRad);
 
   const updateTempFromCoords = (clientX, clientY) => {
+    lastInteractionRef.current = Date.now();
     if (!dialRef.current) return;
     const rect = dialRef.current.getBoundingClientRect();
     const x = clientX - rect.left - rect.width / 2;
@@ -675,10 +693,38 @@ export default function RoomControlPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-transparent text-slate-850">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-8 h-8 animate-spin text-[#FF6B35]" />
-          <p className="text-xs font-semibold text-slate-500">Loading device dashboard...</p>
+      <div className="w-full max-w-4xl mx-auto flex flex-col pb-24 md:pb-8 animate-pulse select-none">
+        <div className="relative w-full min-h-0 bg-transparent flex flex-col md:flex-row justify-center items-stretch gap-6">
+          {/* Left Column Skeleton */}
+          <div className="flex-1 md:max-w-[360px] min-h-[460px] flex flex-col bg-white border border-slate-200/50 rounded-[32px] p-5 shadow-sm justify-between space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="w-8 h-8 rounded-full bg-slate-200 shrink-0" />
+              <div className="h-4 w-28 bg-slate-200 rounded-full" />
+              <div className="w-8 h-8 rounded-full bg-slate-200 shrink-0" />
+            </div>
+            <div className="flex-1 flex items-center justify-center">
+              <div className="w-48 h-48 rounded-full border-8 border-slate-100 flex items-center justify-center bg-slate-50">
+                <div className="flex flex-col items-center space-y-2">
+                  <div className="h-8 w-16 bg-slate-200 rounded-full" />
+                  <div className="h-3 w-10 bg-slate-105 rounded-full" />
+                </div>
+              </div>
+            </div>
+            <div className="h-12 w-full bg-slate-200 rounded-2xl" />
+          </div>
+          {/* Right Column Skeleton */}
+          <div className="flex-1 flex flex-col bg-white border border-slate-200/50 rounded-[32px] p-6 shadow-sm space-y-6">
+            <div className="flex gap-2">
+              <div className="h-8 w-20 bg-slate-200 rounded-full" />
+              <div className="h-8 w-20 bg-slate-100 rounded-full" />
+              <div className="h-8 w-20 bg-slate-100 rounded-full" />
+            </div>
+            <div className="space-y-4 flex-1">
+              <div className="h-4 w-1/3 bg-slate-200 rounded-full" />
+              <div className="h-20 w-full bg-slate-50 rounded-2xl" />
+              <div className="h-20 w-full bg-slate-50 rounded-2xl" />
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -697,9 +743,9 @@ export default function RoomControlPage() {
         <div className="flex items-center justify-between w-full z-10 px-1">
           <button 
             onClick={() => router.push("/dashboard/rooms")}
-            className="p-2.5 rounded-full bg-[#F5F5F7] border border-slate-200/50 hover:bg-[#EAEAEA] text-slate-700 cursor-pointer transition-colors shadow-sm"
+            className="w-10 h-10 rounded-full bg-white border border-slate-200/50 hover:bg-slate-50 flex items-center justify-center cursor-pointer shadow-sm active:scale-95 transition-all"
           >
-            <X className="w-4 h-4 text-slate-700" />
+            <ArrowLeft className="w-4 h-4 text-slate-700" />
           </button>
 
           <div className="flex flex-col items-center text-center flex-1 px-2 min-w-0">
@@ -724,198 +770,251 @@ export default function RoomControlPage() {
 
 
 
-        {/* ========================================================================= */}
-        {/* THE DRAGGABLE DIAL CENTERPIECE */}
-        {/* ========================================================================= */}
-        <div className="flex-1 flex flex-col items-center justify-center my-3 select-none z-10 w-full relative min-h-[220px]">
-          
-          <div 
-            ref={dialRef}
-            onMouseDown={handleStartDrag}
-            onTouchStart={handleStartDrag}
-            className="relative w-56 h-56 flex items-center justify-center select-none cursor-grab active:cursor-grabbing"
-          >
-            {/* Inner shadow layer for dial depth */}
-            <div className="absolute w-[124px] h-[124px] rounded-full bg-white border border-slate-100/60 shadow-[inset_0_2px_8px_rgba(0,0,0,0.01)] pointer-events-none" />
+        {room?.deviceStatus === "online" ? (
+          <div className="flex-1 flex flex-col items-center justify-center my-3 select-none z-10 w-full relative min-h-[220px]">
+            
+            <div 
+              ref={dialRef}
+              onMouseDown={handleStartDrag}
+              onTouchStart={handleStartDrag}
+              className="relative w-56 h-56 flex items-center justify-center select-none cursor-grab active:cursor-grabbing"
+            >
+              {/* Inner shadow layer for dial depth */}
+              <div className="absolute w-[124px] h-[124px] rounded-full bg-white border border-slate-100/60 shadow-[inset_0_2px_8px_rgba(0,0,0,0.01)] pointer-events-none" />
 
-            <svg className="w-full h-full absolute" viewBox="0 0 200 200">
-              {/* Inactive Wavy Track */}
-              <path
-                d={generateWavyPath(30, true)}
-                fill="none"
-                stroke="rgba(15, 23, 42, 0.05)"
-                strokeWidth="4.5"
-                strokeLinecap="round"
-              />
-
-              {/* Active Wavy Progress */}
-              {power === "on" && (
+              <svg className="w-full h-full absolute" viewBox="0 0 200 200">
+                {/* Inactive Wavy Track */}
                 <path
-                  d={generateWavyPath(targetTemp, false)}
+                  d={generateWavyPath(30, true)}
                   fill="none"
-                  stroke="#FF6B35"
+                  stroke="rgba(15, 23, 42, 0.05)"
                   strokeWidth="4.5"
                   strokeLinecap="round"
                 />
-              )}
-            </svg>
 
-             {/* Readout labels */}
-            <div className="absolute flex flex-col items-center justify-center text-center mt-3 pointer-events-none">
-              <div className="flex items-start justify-center relative">
-                <span className="text-6xl font-black text-slate-900 tracking-tighter leading-none select-none">
-                  {power === "on" ? targetTemp : "--"}
-                </span>
-                <span className="text-lg font-bold text-slate-400 select-none mt-1 pl-0.5">
-                  °C
-                </span>
-              </div>
-              
-              <span className="text-[9px] font-black text-gray-450 mt-2.5 tracking-widest uppercase select-none">
-                Room {typeof currentTemp === 'number' ? currentTemp.toFixed(1) : currentTemp}°C
-              </span>
-              
-              {/* Mode display */}
-              {power === "on" && (
-                <div className="flex items-center gap-1.5 mt-2.5 select-none">
-                  <span className={theme.text}>
-                    <Wind className="w-3 h-3 animate-pulse text-[#FF6B35]" />
+                {/* Active Wavy Progress */}
+                {power === "on" && (
+                  <path
+                    d={generateWavyPath(targetTemp, false)}
+                    fill="none"
+                    stroke="#FF6B35"
+                    strokeWidth="4.5"
+                    strokeLinecap="round"
+                  />
+                )}
+              </svg>
+
+               {/* Readout labels */}
+              <div className="absolute flex flex-col items-center justify-center text-center mt-3 pointer-events-none">
+                <div className="flex items-start justify-center relative">
+                  <span className="text-6xl font-black text-slate-900 tracking-tighter leading-none select-none">
+                    {power === "on" ? targetTemp : "--"}
                   </span>
-                  <span className={`text-[9px] font-black uppercase tracking-widest ${theme.text}`}>
-                    {mode}
+                  <span className="text-lg font-bold text-slate-400 select-none mt-1 pl-0.5">
+                    °C
                   </span>
                 </div>
+                
+                <span className="text-[9px] font-black text-gray-450 mt-2.5 tracking-widest uppercase select-none">
+                  Room {typeof currentTemp === 'number' ? currentTemp.toFixed(1) : currentTemp}°C
+                </span>
+                
+                {/* Mode display */}
+                {power === "on" && (
+                  <div className="flex items-center gap-1.5 mt-2.5 select-none">
+                    <span className={theme.text}>
+                      <Wind className="w-3 h-3 animate-pulse text-[#FF6B35]" />
+                    </span>
+                    <span className={`text-[9px] font-black uppercase tracking-widest ${theme.text}`}>
+                      {mode}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="absolute bottom-9 left-9 text-[8px] font-black text-slate-400 tracking-wider">16°C</div>
+              <div className="absolute bottom-9 right-9 text-[8px] font-black text-slate-400 tracking-wider">30°C</div>
+            </div>
+
+            {/* Adjust Buttons */}
+            {power === "on" && (
+              <div className="flex items-center gap-8 mt-2 pb-1">
+                <button 
+                  onClick={() => handleTempAdjust("down")}
+                  className="w-11 h-11 rounded-full bg-[#F5F5F7] border border-slate-200/50 hover:bg-[#EAEAEA] text-slate-700 flex items-center justify-center active:scale-90 transition-all shadow-sm cursor-pointer"
+                >
+                  <Minus className="w-4 h-4" />
+                </button>
+                <button 
+                  onClick={() => handleTempAdjust("up")}
+                  className="w-11 h-11 rounded-full bg-[#F5F5F7] border border-slate-200/50 hover:bg-[#EAEAEA] text-slate-700 flex items-center justify-center active:scale-90 transition-all shadow-sm cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
+            {/* Reserved inline status feedback bar (prevents visual popups and layout shifts) */}
+            <div className="h-5 flex items-center justify-center mt-3 text-center w-full select-none pointer-events-none px-4">
+              {success ? (
+                <span className="text-[9px] font-black text-[#FF6B35] tracking-widest uppercase animate-fadeIn">
+                  {success}
+                </span>
+              ) : error ? (
+                <span className="text-[9px] font-black text-red-500 tracking-widest uppercase animate-fadeIn">
+                  {error}
+                </span>
+              ) : (
+                <span className="text-[9px] font-black text-slate-350 tracking-widest uppercase">
+                  System Synchronized
+                </span>
               )}
             </div>
 
-            <div className="absolute bottom-9 left-9 text-[8px] font-black text-slate-400 tracking-wider">16°C</div>
-            <div className="absolute bottom-9 right-9 text-[8px] font-black text-slate-400 tracking-wider">30°C</div>
           </div>
-
-          {/* Adjust Buttons */}
-          {power === "on" && (
-            <div className="flex items-center gap-8 mt-2 pb-1">
-              <button 
-                onClick={() => handleTempAdjust("down")}
-                className="w-11 h-11 rounded-full bg-[#F5F5F7] border border-slate-200/50 hover:bg-[#EAEAEA] text-slate-700 flex items-center justify-center active:scale-90 transition-all shadow-sm cursor-pointer"
-              >
-                <Minus className="w-4 h-4" />
-              </button>
-              <button 
-                onClick={() => handleTempAdjust("up")}
-                className="w-11 h-11 rounded-full bg-[#F5F5F7] border border-slate-200/50 hover:bg-[#EAEAEA] text-slate-700 flex items-center justify-center active:scale-90 transition-all shadow-sm cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center my-6 z-10 w-full text-center px-4 animate-fadeIn">
+            <div className="w-20 h-20 rounded-full bg-red-50 border border-red-100 flex items-center justify-center shadow-inner mb-4 relative">
+              <div className="absolute inset-0 rounded-full bg-red-500/10 animate-ping opacity-75 duration-1000" style={{ animationDuration: '3s' }} />
+              <WifiOff className="w-9 h-9 text-red-500 relative z-10 animate-pulse" />
             </div>
-          )}
-
-          {/* Reserved inline status feedback bar (prevents visual popups and layout shifts) */}
-          <div className="h-5 flex items-center justify-center mt-3 text-center w-full select-none pointer-events-none px-4">
-            {success ? (
-              <span className="text-[9px] font-black text-[#FF6B35] tracking-widest uppercase animate-fadeIn">
-                {success}
-              </span>
-            ) : error ? (
-              <span className="text-[9px] font-black text-red-500 tracking-widest uppercase animate-fadeIn">
-                {error}
-              </span>
-            ) : (
-              <span className="text-[9px] font-black text-slate-350 tracking-widest uppercase">
-                System Synchronized
-              </span>
-            )}
+            <h3 className="text-base font-extrabold text-slate-800 tracking-tight mb-2">
+              Device Offline
+            </h3>
+            <p className="text-xs text-slate-500 font-medium leading-relaxed max-w-[240px]">
+              The AC controller is disconnected. Make sure the device is plugged in and connected to your local network.
+            </p>
           </div>
-
-        </div>
+        )}
       </div>
 
       {/* RIGHT COLUMN: CONTROLS & DETAILS */}
       <div className="flex-1 md:max-w-[360px] md:max-h-[460px] flex flex-col bg-white border border-slate-200/50 rounded-[24px] sm:rounded-[32px] p-4 sm:p-5 shadow-sm justify-between gap-4">
-        
-        {/* ========================================================================= */}
-        {/* FOUR-COLUMN CONTROL WIDGETS */}
-        {/* ========================================================================= */}
-        <div className="grid grid-cols-4 gap-2 w-full select-none z-10">
-          
-          {/* Mode widget */}
-          <button
-            onClick={handleCycleMode}
-            className={`flex flex-col items-center justify-between p-2.5 rounded-[20px] min-h-[82px] sm:min-h-[88px] active:scale-95 transition-all cursor-pointer text-center ${
-              power === "on" 
-                ? "bg-slate-50 border border-slate-200/65 hover:bg-slate-100 shadow-sm" 
-                : "bg-slate-50 border border-slate-100 opacity-40 pointer-events-none"
-            }`}
-          >
-            <span className="text-[7.5px] font-black text-slate-400 uppercase tracking-widest">Mode</span>
-            <span className={`${power === "on" ? "text-[#FF6B35]" : "text-slate-400"} py-1`}>
-              <Wind className="w-4 h-4" />
-            </span>
-            <span className="text-[9.5px] font-black text-slate-800 capitalize leading-none">{power === "on" ? mode : "--"}</span>
-          </button>
+        {room?.deviceStatus === "online" ? (
+          <>
+            {/* ========================================================================= */}
+            {/* FOUR-COLUMN CONTROL WIDGETS */}
+            {/* ========================================================================= */}
+            <div className="grid grid-cols-4 gap-2 w-full select-none z-10">
+              
+              {/* Mode widget */}
+              <button
+                onClick={handleCycleMode}
+                className={`flex flex-col items-center justify-between p-2.5 rounded-[20px] min-h-[82px] sm:min-h-[88px] active:scale-95 transition-all cursor-pointer text-center ${
+                  power === "on" 
+                    ? "bg-slate-50 border border-slate-200/65 hover:bg-slate-100 shadow-sm" 
+                    : "bg-slate-50 border border-slate-100 opacity-40 pointer-events-none"
+                }`}
+              >
+                <span className="text-[7.5px] font-black text-slate-400 uppercase tracking-widest">Mode</span>
+                <span className={`${power === "on" ? "text-[#FF6B35]" : "text-slate-400"} py-1`}>
+                  <Wind className="w-4 h-4" />
+                </span>
+                <span className="text-[9.5px] font-black text-slate-800 capitalize leading-none">{power === "on" ? mode : "--"}</span>
+              </button>
 
-          {/* Fan speed widget */}
-          <button
-            onClick={handleCycleFan}
-            className={`flex flex-col items-center justify-between p-2.5 rounded-[20px] min-h-[82px] sm:min-h-[88px] active:scale-95 transition-all cursor-pointer text-center ${
-              power === "on" 
-                ? "bg-slate-50 border border-slate-200/65 hover:bg-slate-100 shadow-sm" 
-                : "bg-slate-50 border border-slate-100 opacity-40 pointer-events-none"
-            }`}
-          >
-            <span className="text-[7.5px] font-black text-slate-400 uppercase tracking-widest">Fan</span>
-            <span className="text-[#FF6B35] py-1">
-              <Fan className={`w-4 h-4 ${power === "on" ? "animate-spin-slow text-[#FF6B35]" : "text-slate-400"}`} />
-            </span>
-            <span className="text-[9.5px] font-black text-slate-800 capitalize leading-none">{power === "on" ? fanSpeed : "--"}</span>
-          </button>
+              {/* Fan speed widget */}
+              <button
+                onClick={handleCycleFan}
+                className={`flex flex-col items-center justify-between p-2.5 rounded-[20px] min-h-[82px] sm:min-h-[88px] active:scale-95 transition-all cursor-pointer text-center ${
+                  power === "on" 
+                    ? "bg-slate-50 border border-slate-200/65 hover:bg-slate-100 shadow-sm" 
+                    : "bg-slate-50 border border-slate-100 opacity-40 pointer-events-none"
+                }`}
+              >
+                <span className="text-[7.5px] font-black text-slate-400 uppercase tracking-widest">Fan</span>
+                <span className="text-[#FF6B35] py-1">
+                  <Fan className={`w-4 h-4 ${power === "on" ? "animate-spin-slow text-[#FF6B35]" : "text-slate-400"}`} />
+                </span>
+                <span className="text-[9.5px] font-black text-slate-800 capitalize leading-none">{power === "on" ? fanSpeed : "--"}</span>
+              </button>
 
-          {/* Swing widget */}
-          <button
-            onClick={handleSwingToggle}
-            className={`flex flex-col items-center justify-between p-2.5 rounded-[20px] min-h-[82px] sm:min-h-[88px] active:scale-95 transition-all cursor-pointer text-center ${
-              power === "on" 
-                ? "bg-slate-50 border border-slate-200/65 hover:bg-slate-100 shadow-sm" 
-                : "bg-slate-50 border border-slate-100 opacity-40 pointer-events-none"
-            }`}
-          >
-            <span className="text-[7.5px] font-black text-slate-400 uppercase tracking-widest">Swing</span>
-            <span className={`py-1 ${power === "on" && swing === "on" ? "text-[#FF6B35]" : "text-slate-400"}`}>
-              <RotateCw className="w-4 h-4" />
-            </span>
-            <span className="text-[9.5px] font-black text-slate-800 capitalize leading-none">{power === "on" ? swing : "--"}</span>
-          </button>
+              {/* Swing widget */}
+              <button
+                onClick={handleSwingToggle}
+                className={`flex flex-col items-center justify-between p-2.5 rounded-[20px] min-h-[82px] sm:min-h-[88px] active:scale-95 transition-all cursor-pointer text-center ${
+                  power === "on" 
+                    ? "bg-slate-50 border border-slate-200/65 hover:bg-slate-100 shadow-sm" 
+                    : "bg-slate-50 border border-slate-100 opacity-40 pointer-events-none"
+                }`}
+              >
+                <span className="text-[7.5px] font-black text-slate-400 uppercase tracking-widest">Swing</span>
+                <span className={`py-1 ${power === "on" && swing === "on" ? "text-[#FF6B35]" : "text-slate-400"}`}>
+                  <RotateCw className="w-4 h-4" />
+                </span>
+                <span className="text-[9.5px] font-black text-slate-800 capitalize leading-none">{power === "on" ? swing : "--"}</span>
+              </button>
 
-          {/* Power Widget */}
-          <button
-            onClick={handlePowerToggle}
-            className={`flex flex-col items-center justify-between p-2.5 rounded-[20px] min-h-[82px] sm:min-h-[88px] active:scale-95 transition-all cursor-pointer text-center border ${
-              power === "on" 
-                ? "bg-red-50/40 border-red-200/40 hover:bg-red-50" 
-                : "bg-slate-50 border border-slate-200/65 hover:bg-slate-100 shadow-sm"
-            }`}
-          >
-            <span className="text-[7.5px] font-black text-slate-400 uppercase tracking-widest">Power</span>
-            <span className={`w-8 h-8 rounded-full flex items-center justify-center ${
-              power === "on" ? "bg-red-600 text-white shadow-sm" : "bg-slate-100 text-slate-400 border border-slate-200/50"
-            }`}>
-              <Power className="w-4 h-4" />
-            </span>
-            <span className="text-[9.5px] font-black text-slate-800 capitalize leading-none">{power}</span>
-          </button>
+              {/* Power Widget */}
+              <button
+                onClick={handlePowerToggle}
+                className={`flex flex-col items-center justify-between p-2.5 rounded-[20px] min-h-[82px] sm:min-h-[88px] active:scale-95 transition-all cursor-pointer text-center border ${
+                  power === "on" 
+                    ? "bg-red-50/40 border-red-200/40 hover:bg-red-50" 
+                    : "bg-slate-50 border border-slate-200/65 hover:bg-slate-100 shadow-sm"
+                }`}
+              >
+                <span className="text-[7.5px] font-black text-slate-400 uppercase tracking-widest">Power</span>
+                <span className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                  power === "on" ? "bg-red-600 text-white shadow-sm" : "bg-slate-100 text-slate-400 border border-slate-200/50"
+                }`}>
+                  <Power className="w-4 h-4" />
+                </span>
+                <span className="text-[9.5px] font-black text-slate-800 capitalize leading-none">{power}</span>
+              </button>
 
-        </div>
+            </div>
 
-        {/* ========================================================================= */}
-        {/* PRE-COOL TRIGGER */}
-        {/* ========================================================================= */}
-        <button
-          onClick={handlePrecool}
-          disabled={actionLoading}
-          className="w-full py-4 bg-[#FF6B35] hover:bg-[#E0531F] disabled:opacity-50 active:scale-[0.98] text-white text-[11px] font-black uppercase tracking-widest rounded-full transition-all cursor-pointer shadow-lg shadow-[#FF6B35]/15 text-center z-10 mt-auto"
-        >
-          {actionLoading ? "Processing command..." : "Pre-cool Room"}
-        </button>
+            {/* ========================================================================= */}
+            {/* PRE-COOL TRIGGER */}
+            {/* ========================================================================= */}
+            <button
+              onClick={handlePrecool}
+              disabled={actionLoading}
+              className="w-full py-4 bg-[#FF6B35] hover:bg-[#E0531F] disabled:opacity-50 active:scale-[0.98] text-white text-[11px] font-black uppercase tracking-widest rounded-full transition-all cursor-pointer shadow-lg shadow-[#FF6B35]/15 text-center z-10 mt-auto"
+            >
+              {actionLoading ? "Processing command..." : "Pre-cool Room"}
+            </button>
+          </>
+        ) : (
+          <div className="flex-1 flex flex-col justify-between py-2 px-1 animate-fadeIn h-full">
+            <div className="space-y-4">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-0.5">
+                Troubleshooting Guide
+              </span>
+              
+              <div className="space-y-3">
+                <div className="flex gap-3 items-start bg-slate-50 border border-slate-100 p-3 rounded-2xl">
+                  <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">1</span>
+                  <p className="text-[11px] text-slate-600 leading-relaxed">
+                    Check if the physical controller hub has power (verify the LED status light on the hardware).
+                  </p>
+                </div>
+
+                <div className="flex gap-3 items-start bg-slate-50 border border-slate-100 p-3 rounded-2xl">
+                  <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">2</span>
+                  <p className="text-[11px] text-slate-600 leading-relaxed">
+                    Ensure your local Wi-Fi network is functioning and the controller is within range.
+                  </p>
+                </div>
+
+                <div className="flex gap-3 items-start bg-slate-50 border border-slate-100 p-3 rounded-2xl">
+                  <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">3</span>
+                  <p className="text-[11px] text-slate-600 leading-relaxed">
+                    If re-pairing is needed, tap the **Settings** icon above to regenerate the pairing claim code.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-[#F5F5F7] border border-slate-200/60 rounded-2xl p-3.5 space-y-2 mt-auto">
+              <div className="flex items-center justify-between text-[10px]">
+                <span className="font-bold text-slate-400 uppercase tracking-wider">Device ID</span>
+                <span className="font-mono font-bold text-slate-700">{deviceId || "N/A"}</span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       </div> {/* Closes inner columns wrapper */}
@@ -948,7 +1047,10 @@ export default function RoomControlPage() {
           </div>
         </div>
         
-        <div className="h-44 overflow-y-auto bg-slate-955/70 rounded-2xl p-3 text-[10px] space-y-1.5 scrollbar-thin border border-slate-950/40 select-text">
+        <div 
+          ref={logContainerRef}
+          className="h-44 overflow-y-auto bg-slate-955/70 rounded-2xl p-3 text-[10px] space-y-1.5 scrollbar-thin border border-slate-950/40 select-text"
+        >
           {logs.length > 0 ? (
             logs.map((log, idx) => (
               <div key={idx} className="flex gap-2.5 items-start leading-relaxed">
@@ -961,7 +1063,6 @@ export default function RoomControlPage() {
               {deviceId ? "Listening for live MQTT telemetry logs..." : "Waiting for paired device to begin logging..."}
             </div>
           )}
-          <div ref={logEndRef} />
         </div>
       </div>
 

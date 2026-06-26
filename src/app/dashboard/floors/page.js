@@ -271,36 +271,27 @@ export default function FloorManagerPage() {
     setIsEditOpen(true);
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-[60vh] flex items-center justify-center bg-transparent text-slate-800">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-6 h-6 animate-spin text-[#FF6B35]" />
-          <p className="text-xs font-semibold text-slate-500">Retrieving building layers...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="relative space-y-5 text-left select-none animate-fadeIn flex flex-col pb-12 min-h-[80vh]">
+    <div className="relative w-full min-h-screen md:min-h-0 bg-transparent text-[#1C1C1E] flex flex-col pt-2 sm:pt-4 pb-16 select-none text-left animate-fadeIn max-w-2xl mx-auto">
       
       {/* Background decorations */}
       <div className="absolute top-0 left-10 w-64 h-64 bg-[#FF6B35]/[0.01] rounded-full blur-[80px] pointer-events-none" />
 
       {/* A. HEADER ROW */}
-      <div className="flex items-center justify-between w-full z-30 px-1">
+      <div className="flex items-center justify-between w-full pb-6 z-10">
         <button 
           onClick={() => router.back()}
-          className="p-2.5 rounded-full bg-white border border-slate-200/50 hover:bg-slate-50 text-slate-700 cursor-pointer transition-colors shadow-sm"
+          className="w-10 h-10 rounded-full bg-white border border-slate-200/50 hover:bg-slate-50 flex items-center justify-center cursor-pointer shadow-sm active:scale-95 transition-all"
         >
-          <ArrowLeft className="w-4 h-4" />
+          <ArrowLeft className="w-4 h-4 text-slate-700" />
         </button>
 
         <div className="flex flex-col items-center text-center">
-          <h2 className="text-sm font-black uppercase tracking-wider text-slate-900">Floor Manager</h2>
+          <h1 className="text-[20px] font-semibold tracking-tight text-[#1C1C1E]">
+            Floor Manager
+          </h1>
           {activeProperty && (
-            <span className="text-[9px] font-black text-[#FF6B35] uppercase tracking-widest mt-0.5">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
               {activeProperty.name}
             </span>
           )}
@@ -308,82 +299,105 @@ export default function FloorManagerPage() {
 
         <button 
           onClick={() => setIsAddOpen(true)}
-          className="p-2.5 rounded-full bg-white border border-slate-200/50 hover:bg-slate-50 text-slate-750 cursor-pointer transition-colors shadow-sm"
+          className="w-10 h-10 rounded-full bg-white border border-slate-200/50 hover:bg-slate-50 flex items-center justify-center cursor-pointer shadow-sm active:scale-95 transition-all"
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="w-4 h-4 text-slate-700" />
         </button>
       </div>
 
-      {/* Status Notifications */}
-      {(error || success) && (
-        <div className="space-y-2 z-10">
-          {error && (
-            <div className="flex items-start gap-3 p-4 rounded-[20px] bg-red-50 border border-red-100 text-red-700 text-xs shadow-sm">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-500" />
-              <span>{error}</span>
-            </div>
-          )}
-          {success && (
-            <div className="flex items-center gap-2.5 p-4 rounded-[20px] bg-green-50 border border-green-100 text-green-700 text-xs shadow-sm">
-              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              <span>{success}</span>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* B. LIST OF FLOORS */}
-      {floors.length === 0 ? (
-        <div className="bg-white border border-slate-200/50 rounded-[32px] p-12 text-center flex flex-col items-center justify-center gap-4 flex-1 z-10 shadow-sm">
-          <Building className="w-8 h-8 text-slate-300" />
-          <span className="text-[11px] text-gray-450 font-black tracking-wider uppercase">
-            No floors declared for this property.
-          </span>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 z-10">
-          {floors.map((floor) => (
-            <div
-              key={floor.floorId}
-              className="bg-white border border-slate-200/50 rounded-[24px] sm:rounded-[32px] p-5 flex items-center justify-between shadow-sm relative group transition-all hover:border-[#FF6B35]/40"
-            >
+      {loading ? (
+        /* Premium Flashing Skeleton Loader Screen */
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 z-10 animate-pulse select-none w-full">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-white border border-slate-200/50 rounded-[24px] sm:rounded-[32px] p-5 flex items-center justify-between shadow-sm relative">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-[#FF6B35]/5 border border-[#FF6B35]/10 flex items-center justify-center text-[#FF6B35]">
-                  <Layers className="w-5 h-5" />
-                </div>
-                <div className="flex flex-col text-left">
-                  <span className="text-sm font-black text-slate-800 tracking-tight">
-                    {floor.name}
-                  </span>
-                  <span className="text-[10px] font-bold text-slate-400 mt-0.5">
-                    {floor.roomCount || 0} {floor.roomCount === 1 ? "Room" : "Rooms"} paired
-                  </span>
+                <div className="w-10 h-10 rounded-2xl bg-slate-200 shrink-0" />
+                <div className="flex flex-col space-y-2 text-left">
+                  <div className="h-3.5 w-24 bg-slate-200 rounded-full" />
+                  <div className="h-2.5 w-16 bg-slate-100 rounded-full" />
                 </div>
               </div>
-
-              {/* Action buttons */}
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => openEditModal(floor)}
-                  className="p-2 rounded-full text-slate-400 hover:text-slate-655 hover:bg-[#F5F5F7] transition-colors cursor-pointer"
-                  title="Rename Floor"
-                >
-                  <Edit2 className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => {
-                    setDeletingFloor(floor);
-                    setIsDeleteOpen(true);
-                  }}
-                  className="p-2 rounded-full text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
-                  title="Delete Floor"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-slate-100 shrink-0" />
+                <div className="w-8 h-8 rounded-full bg-slate-100 shrink-0" />
               </div>
             </div>
           ))}
         </div>
+      ) : (
+        <>
+          {/* Status Notifications */}
+          {(error || success) && (
+            <div className="space-y-2 z-10">
+              {error && (
+                <div className="flex items-start gap-3 p-4 rounded-[20px] bg-red-50 border border-red-100 text-red-700 text-xs shadow-sm">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-500" />
+                  <span>{error}</span>
+                </div>
+              )}
+              {success && (
+                <div className="flex items-center gap-2.5 p-4 rounded-[20px] bg-green-50 border border-green-100 text-green-700 text-xs shadow-sm">
+                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                  <span>{success}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* B. LIST OF FLOORS */}
+          {floors.length === 0 ? (
+            <div className="bg-white border border-slate-200/50 rounded-[32px] p-12 text-center flex flex-col items-center justify-center gap-4 flex-1 z-10 shadow-sm">
+              <Building className="w-8 h-8 text-slate-300" />
+              <span className="text-[11px] text-gray-450 font-black tracking-wider uppercase">
+                No floors declared for this property.
+              </span>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 z-10">
+              {floors.map((floor) => (
+                <div
+                  key={floor.floorId}
+                  className="bg-white border border-slate-200/50 rounded-[24px] sm:rounded-[32px] p-5 flex items-center justify-between shadow-sm relative group transition-all hover:border-[#FF6B35]/40"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-[#FF6B35]/5 border border-[#FF6B35]/10 flex items-center justify-center text-[#FF6B35]">
+                      <Layers className="w-5 h-5" />
+                    </div>
+                    <div className="flex flex-col text-left">
+                      <span className="text-sm font-black text-slate-800 tracking-tight">
+                        {floor.name}
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-400 mt-0.5">
+                        {floor.roomCount || 0} {floor.roomCount === 1 ? "Room" : "Rooms"} paired
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => openEditModal(floor)}
+                      className="p-2 rounded-full text-slate-400 hover:text-slate-655 hover:bg-[#F5F5F7] transition-colors cursor-pointer"
+                      title="Rename Floor"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setDeletingFloor(floor);
+                        setIsDeleteOpen(true);
+                      }}
+                      className="p-2 rounded-full text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
+                      title="Delete Floor"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {/* C. ADD FLOOR MODAL */}

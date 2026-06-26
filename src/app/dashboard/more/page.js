@@ -8,7 +8,7 @@ import {
   Building, 
   Layers, 
   ChevronRight, 
-  ChevronLeft,
+  ArrowLeft,
   Loader2, 
   AlertCircle, 
   CheckCircle2, 
@@ -275,10 +275,10 @@ export default function MorePage() {
   const [success, setSuccess] = useState("");
 
   return (
-    <div className="relative w-full min-h-screen md:min-h-0 bg-transparent text-[#1C1C1E] flex flex-col pb-12 select-none text-left animate-fadeIn max-w-2xl mx-auto">
+    <div className="relative w-full min-h-screen md:min-h-0 bg-transparent text-[#1C1C1E] flex flex-col pt-2 sm:pt-4 pb-16 select-none text-left animate-fadeIn max-w-2xl mx-auto">
       
       {/* HEADER BAR */}
-      <div className="flex items-center justify-between w-full pb-4 border-b border-slate-200/60 z-30">
+      <div className="flex items-center justify-between w-full pb-6 z-10">
         <div className="flex items-center gap-2.5">
           {activePanel !== "main" && (
             <button 
@@ -287,9 +287,9 @@ export default function MorePage() {
                 setError("");
                 setSuccess("");
               }}
-              className="p-1.5 rounded-full text-slate-600 hover:text-slate-900 cursor-pointer hover:bg-slate-50 transition-all border border-slate-200 bg-white shadow-sm"
+              className="w-10 h-10 rounded-full bg-white border border-slate-200/50 hover:bg-slate-50 flex items-center justify-center cursor-pointer shadow-sm active:scale-95 transition-all"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ArrowLeft className="w-4 h-4 text-slate-700" />
             </button>
           )}
 
@@ -327,80 +327,115 @@ export default function MorePage() {
         {activePanel === "main" && (
           <div className="space-y-4">
             
-            {/* Quick Profile Widget */}
-            {profile && (
-              <div 
-                onClick={() => setActivePanel("profile")}
-                className="bg-white border border-slate-200/80 p-4 rounded-[24px] flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-all shadow-sm"
-              >
-                <div className="flex items-center gap-3">
-                  <div 
-                    className="w-10 h-10 rounded-full flex items-center justify-center font-black text-white text-xs uppercase shadow-sm"
-                    style={{ backgroundColor: profile.avatarColor || "#FF6B35" }}
-                  >
-                    {profile.avatarInitials || "U"}
+            {loadingProfile || loadingProps ? (
+              /* Premium Flashing Skeleton Loader Screen */
+              <div className="space-y-4 animate-pulse select-none">
+                {/* Profile Skeleton */}
+                <div className="bg-white border border-[#EAEAEA] p-4 rounded-[24px] flex items-center justify-between shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-slate-200 shrink-0" />
+                    <div className="space-y-2 text-left">
+                      <div className="h-3.5 w-24 bg-slate-200 rounded-full" />
+                      <div className="h-2 w-32 bg-slate-100 rounded-full" />
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="text-xs font-black text-slate-800">{profile.name || "Administrator"}</h4>
-                    <p className="text-[9.5px] font-bold text-slate-500 uppercase tracking-wider mt-0.5">{profile.email}</p>
-                  </div>
+                  <div className="w-4 h-4 bg-slate-100 rounded-full" />
                 </div>
-                <ChevronRight className="w-4 h-4 text-slate-400" />
+
+                {/* Settings Menu Skeleton */}
+                <div className="bg-white border border-[#EAEAEA] rounded-[24px] p-2 space-y-4 shadow-sm">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-6 h-6 bg-slate-200 rounded-full shrink-0" />
+                        <div className="space-y-2 text-left">
+                          <div className="h-3.5 w-40 bg-slate-200 rounded-full" />
+                          <div className="h-2 w-24 bg-slate-100 rounded-full" />
+                        </div>
+                      </div>
+                      <div className="w-4 h-4 bg-slate-100 rounded-full" />
+                    </div>
+                  ))}
+                </div>
               </div>
+            ) : (
+              <>
+                {/* Quick Profile Widget */}
+                {profile && (
+                  <div 
+                    onClick={() => setActivePanel("profile")}
+                    className="bg-white border border-slate-200/80 p-4 rounded-[24px] flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-all shadow-sm"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div 
+                        className="w-10 h-10 rounded-full flex items-center justify-center font-black text-white text-xs uppercase shadow-sm"
+                        style={{ backgroundColor: profile.avatarColor || "#FF6B35" }}
+                      >
+                        {profile.avatarInitials || "U"}
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-black text-slate-800">{profile.name || "Administrator"}</h4>
+                        <p className="text-[9.5px] font-bold text-slate-500 uppercase tracking-wider mt-0.5">{profile.email}</p>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-slate-400" />
+                  </div>
+                )}
+
+                {/* Menu List Grid */}
+                <div className="bg-white border border-slate-200/80 rounded-[24px] overflow-hidden shadow-sm divide-y divide-slate-200">
+                  
+                  {/* Property Settings */}
+                  <button
+                    onClick={() => setActivePanel("property")}
+                    className="w-full px-5 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors text-left cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Building className="w-4.5 h-4.5 text-[#FF6B35]" />
+                      <div>
+                        <span className="text-xs font-black text-slate-800 block">Property Administration</span>
+                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mt-0.5">
+                          {activeProperty ? activeProperty.name : "Configure properties"}
+                        </span>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-slate-400" />
+                  </button>
+
+                  {/* Floor Management */}
+                  <button
+                    onClick={() => router.push("/dashboard/floors")}
+                    disabled={!activeProperty}
+                    className="w-full px-5 py-4 flex items-center justify-between hover:bg-slate-50 disabled:opacity-50 transition-colors text-left cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Layers className="w-4.5 h-4.5 text-[#FF6B35]" />
+                      <div>
+                        <span className="text-xs font-black text-slate-800 block">Floor Levels Directory</span>
+                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mt-0.5">Manage building zones</span>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-slate-400" />
+                  </button>
+
+                  {/* Personnel Registry Link */}
+                  <button
+                    onClick={() => router.push("/dashboard/staff")}
+                    className="w-full px-5 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors text-left cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3">
+                      <User className="w-4.5 h-4.5 text-[#FF6B35]" />
+                      <div>
+                        <span className="text-xs font-black text-slate-800 block">Personnel &amp; Staff Registry</span>
+                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mt-0.5">Staff roles &amp; permissions</span>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-slate-400" />
+                  </button>
+
+                </div>
+              </>
             )}
-
-            {/* Menu List Grid */}
-            <div className="bg-white border border-slate-200/80 rounded-[24px] overflow-hidden shadow-sm divide-y divide-slate-200">
-              
-              {/* Property Settings */}
-              <button
-                onClick={() => setActivePanel("property")}
-                className="w-full px-5 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors text-left cursor-pointer"
-              >
-                <div className="flex items-center gap-3">
-                  <Building className="w-4.5 h-4.5 text-[#FF6B35]" />
-                  <div>
-                    <span className="text-xs font-black text-slate-800 block">Property Administration</span>
-                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mt-0.5">
-                      {activeProperty ? activeProperty.name : "Configure properties"}
-                    </span>
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-slate-400" />
-              </button>
-
-              {/* Floor Management */}
-              <button
-                onClick={() => router.push("/dashboard/floors")}
-                disabled={!activeProperty}
-                className="w-full px-5 py-4 flex items-center justify-between hover:bg-slate-50 disabled:opacity-50 transition-colors text-left cursor-pointer"
-              >
-                <div className="flex items-center gap-3">
-                  <Layers className="w-4.5 h-4.5 text-[#FF6B35]" />
-                  <div>
-                    <span className="text-xs font-black text-slate-800 block">Floor Levels Directory</span>
-                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mt-0.5">Manage building zones</span>
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-slate-400" />
-              </button>
-
-              {/* Personnel Registry Link */}
-              <button
-                onClick={() => router.push("/dashboard/staff")}
-                className="w-full px-5 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors text-left cursor-pointer"
-              >
-                <div className="flex items-center gap-3">
-                  <User className="w-4.5 h-4.5 text-[#FF6B35]" />
-                  <div>
-                    <span className="text-xs font-black text-slate-800 block">Personnel &amp; Staff Registry</span>
-                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mt-0.5">Staff roles &amp; permissions</span>
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-slate-400" />
-              </button>
-
-            </div>
 
             {/* System Info Block */}
             <div className="bg-slate-50 border border-slate-200/60 p-4 rounded-[24px] flex flex-col gap-2 text-slate-500 text-[9px] font-bold select-text">

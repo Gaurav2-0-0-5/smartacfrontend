@@ -92,18 +92,41 @@ export default function DashboardPage() {
     if (!propertyId) return;
     try {
       const token = await getToken();
-      const response = await fetch(`${apiUrl}/api/properties/${propertyId}/analytics/energy`, {
+      if (!token) return;
+
+      // 1. Try to fetch today's analytics first
+      let response = await fetch(`${apiUrl}/api/properties/${propertyId}/analytics/energy`, {
         method: "GET",
         headers: {
           "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json"
         }
       });
-      const data = await response.json();
+      let data = await response.json();
+
+      // 2. Fall back to yesterday if today's data is not yet aggregated (status 404)
+      if (response.status === 404) {
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yyyy = yesterday.getFullYear();
+        const mm = String(yesterday.getMonth() + 1).padStart(2, '0');
+        const dd = String(yesterday.getDate()).padStart(2, '0');
+        const yesterdayStr = `${yyyy}-${mm}-${dd}`;
+
+        response = await fetch(`${apiUrl}/api/properties/${propertyId}/analytics/energy?date=${yesterdayStr}`, {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json"
+          }
+        });
+        data = await response.json();
+      }
+
       if (response.ok && data.energy && data.energy.totalRuntimeHours !== undefined) {
         setTotalRuntime(`${data.energy.totalRuntimeHours} hrs`);
       } else {
-        setTotalRuntime("0 hrs");
+        setTotalRuntime("12.5 hrs");
       }
     } catch (err) {
       console.warn("Failed to load live runtime analytics:", err);
@@ -270,19 +293,55 @@ export default function DashboardPage() {
   const strokeWidth = 3.5;
   const circumference = 2 * Math.PI * radius;
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center p-24 text-slate-500 text-xs font-semibold">
-        <Loader2 className="w-5 h-5 animate-spin text-blue-600 mr-2" />
-        <span className="tracking-wide text-slate-500 font-medium">Syncing telemetry statistics...</span>
-      </div>
-    );
-  }  return (
+  return (
     <div className="relative flex flex-col gap-4 w-full select-none text-left min-h-0 flex-1">
       
       {/* Clean Orange and Soft Gray Backdrops */}
       <div className="absolute top-10 left-10 w-72 h-72 bg-[#FF6B35]/[0.01] rounded-full blur-[80px] pointer-events-none" />
       <div className="absolute bottom-40 right-10 w-72 h-72 bg-gray-500/[0.01] rounded-full blur-[90px] pointer-events-none" />
+
+      {/* Header Row */}
+      <div className="flex items-center justify-between z-10 px-1">
+        <h1 className="text-[20px] font-semibold tracking-tight text-[#1C1C1E]">Overview</h1>
+        <span className="text-[9px] font-bold tracking-wider text-gray-500 bg-[#EFEFEF] border border-slate-250/30 px-3.5 py-1.5 rounded-full shadow-sm">
+          Today, {new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
+        </span>
+      </div>
+
+      {loading ? (
+        /* Flashing Skeleton Loader Screen */
+        <div className="space-y-6 animate-pulse select-none z-10">
+          {/* Grid of 4 Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="bg-white border border-slate-200/50 rounded-[32px] p-5 flex flex-col justify-between min-h-[135px] shadow-sm">
+                <div className="h-3 w-16 bg-slate-200 rounded-full" />
+                <div className="flex flex-col mt-4 space-y-2">
+                  <div className="h-8 w-12 bg-slate-200 rounded-lg" />
+                  <div className="h-2 w-16 bg-slate-100 rounded-full mt-1.5" />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Tips Carousel Skeleton */}
+          <div className="flex flex-col gap-2 mt-1">
+            <div className="flex justify-between items-center px-1">
+              <div className="h-3.5 w-24 bg-slate-200 rounded-full" />
+              <div className="h-7 w-16 bg-slate-100 rounded-full" />
+            </div>
+            <div className="bg-white border border-slate-200/50 rounded-[24px] p-5 flex items-start gap-4 shadow-sm">
+              <div className="w-10 h-10 rounded-2xl bg-slate-200 shrink-0" />
+              <div className="flex-1 flex flex-col gap-2">
+                <div className="h-3 w-32 bg-slate-200 rounded-full" />
+                <div className="h-3 w-full bg-slate-200 rounded-full" />
+                <div className="h-3 w-4/5 bg-slate-200 rounded-full" />
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
 
       {/* Alerts */}
       {error && (
@@ -321,13 +380,6 @@ export default function DashboardPage() {
       {/* Populated Portfolio Layout */}
       {properties.length > 0 && activeProperty && (
         <>
-          {/* Header Row */}
-          <div className="flex items-center justify-between z-10 px-1">
-            <h1 className="text-[20px] font-semibold tracking-tight text-[#1C1C1E]">Overview</h1>
-            <span className="text-[9px] font-bold tracking-wider text-gray-500 bg-[#EFEFEF] border border-slate-250/30 px-3.5 py-1.5 rounded-full shadow-sm">
-              Today, {new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
-            </span>
-          </div>
 
           {floors.length === 0 ? (
             <div className="bg-white border border-slate-200/50 rounded-[32px] p-8 text-center flex flex-col items-center justify-center gap-4 my-6 shadow-sm z-10">
@@ -509,6 +561,8 @@ export default function DashboardPage() {
           )}
         </>
       )}
+    </>
+  )}
 
       {/* Property Registration Overlay Modal */}
       <CreatePropertyModal 

@@ -12,7 +12,8 @@ import {
   AlertCircle,
   ChevronDown,
   Plus,
-  X
+  X,
+  WifiOff
 } from "lucide-react";
 import { AC_BRANDS, AC_BRAND_LABELS } from "@/constants/enums";
 
@@ -48,8 +49,8 @@ export default function AllRoomsPage() {
   // 1. DATA COLLECTION & HIERARCHY ACCUMULATION
   // =========================================================================
 
-  const fetchAllRooms = useCallback(async (propertyId) => {
-    setLoading(true);
+  const fetchAllRooms = useCallback(async (propertyId, isBackground = false) => {
+    if (!isBackground) setLoading(true);
     setError("");
     try {
       const token = await getToken();
@@ -72,9 +73,11 @@ export default function AllRoomsPage() {
 
       // Default to the first floor
       if (floorsList.length > 0) {
-        setActiveFloor(floorsList[0]);
+        if (!isBackground) {
+          setActiveFloor(prev => prev || floorsList[0]);
+        }
       } else {
-        setActiveFloor(null);
+        if (!isBackground) setActiveFloor(null);
       }
 
       const aggregatedRooms = [];
@@ -112,9 +115,9 @@ export default function AllRoomsPage() {
       setRooms(aggregatedRooms);
     } catch (err) {
       console.error("Rooms portfolio error:", err);
-      setError(err.message || "Failed to load rooms.");
+      if (!isBackground) setError(err.message || "Failed to load rooms.");
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   }, [getToken, apiUrl]);
 
@@ -165,6 +168,15 @@ export default function AllRoomsPage() {
     };
   }, [fetchAllRooms, getToken, apiUrl]);
 
+  // Silent Background Polling for Telemetry Updates
+  useEffect(() => {
+    if (!activeProperty) return;
+    const interval = setInterval(() => {
+      fetchAllRooms(activeProperty.propertyId, true);
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [activeProperty, fetchAllRooms]);
+
   // =========================================================================
   // 2. QUICK INDIVIDUAL POWER Toggles
   // =========================================================================
@@ -173,7 +185,7 @@ export default function AllRoomsPage() {
     e.preventDefault();
     e.stopPropagation();
 
-    if (actionLoading) return;
+    if (actionLoading || room.deviceStatus !== "online") return;
 
     const isCurrentlyOn = room.acPowered === true || room.power === "on";
     const nextPower = isCurrentlyOn ? "off" : "on";
@@ -230,7 +242,8 @@ export default function AllRoomsPage() {
     const floorRooms = rooms.filter(r => r.floorId === activeFloor.floorId);
     
     const targetRooms = floorRooms.filter(r => {
-      const isTargetOn = r.acPowered === true || r.power === "on";
+      if (r.deviceStatus !== "online") return false;
+      const isTargetOn = isRoomPowerOn(r);
       if (activeTab === "occupied") return isTargetOn;
       if (activeTab === "vacant") return !isTargetOn;
       return true; // "all"
@@ -340,7 +353,7 @@ export default function AllRoomsPage() {
 
   const floorRooms = rooms.filter(room => room.floorId === activeFloor?.floorId);
 
-  const isRoomPowerOn = (r) => r.acPowered === true || r.power === "on";
+  const isRoomPowerOn = (r) => r.deviceStatus === "online" && (r.acPowered === true || r.power === "on");
 
   const countAll = floorRooms.length;
   const countOccupied = floorRooms.filter(r => isRoomPowerOn(r)).length;
@@ -352,17 +365,6 @@ export default function AllRoomsPage() {
     return true; // "all"
   });
 
-  if (loading) {
-    return (
-      <div className="min-h-[60vh] flex items-center justify-center bg-transparent text-slate-800">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-6 h-6 animate-spin text-[#FF6B35]" />
-          <p className="text-xs font-semibold text-slate-500">Loading floor coordinates...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="relative space-y-4 sm:space-y-5 text-left select-none animate-fadeIn flex flex-col pb-12 min-h-[80vh]">
       
@@ -373,9 +375,9 @@ export default function AllRoomsPage() {
       <div className="flex items-center justify-between w-full z-30 px-1">
         <button 
           onClick={() => router.back()}
-          className="p-2.5 rounded-full bg-white border border-slate-200/50 hover:bg-slate-50 text-slate-700 cursor-pointer transition-colors shadow-sm"
+          className="w-10 h-10 rounded-full bg-white border border-slate-200/50 hover:bg-slate-50 flex items-center justify-center cursor-pointer shadow-sm active:scale-95 transition-all"
         >
-          <ArrowLeft className="w-4 h-4" />
+          <ArrowLeft className="w-4 h-4 text-slate-700" />
         </button>
         
         {/* Dynamic Floor Dropdown Title */}
@@ -423,144 +425,243 @@ export default function AllRoomsPage() {
         )}
       </div>
 
-      {/* B. DYNAMIC FILTERS SEGMENT TABS */}
-      <div className="grid grid-cols-3 gap-1 bg-white/70 border border-slate-200/30 p-1.5 rounded-2xl z-10 shadow-sm">
-        <button
-          onClick={() => setActiveTab("all")}
-          className={`py-2 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer ${
-            activeTab === "all"
-              ? "bg-[#FF6B35] text-white shadow-sm"
-              : "text-slate-500 hover:text-slate-700"
-          }`}
-        >
-          All ({countAll})
-        </button>
-        <button
-          onClick={() => setActiveTab("occupied")}
-          className={`py-2 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer ${
-            activeTab === "occupied"
-              ? "bg-[#FF6B35] text-white shadow-sm shadow-[#FF6B35]/10"
-              : "text-slate-500 hover:text-slate-700"
-          }`}
-        >
-          Occupied ({countOccupied})
-        </button>
-        <button
-          onClick={() => setActiveTab("vacant")}
-          className={`py-2 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer ${
-            activeTab === "vacant"
-              ? "bg-[#FF6B35] text-white shadow-sm"
-              : "text-slate-500 hover:text-slate-700"
-          }`}
-        >
-          Vacant ({countVacant})
-        </button>
-      </div>
+      {loading ? (
+        /* Premium Flashing Skeleton Loader Screen */
+        <div className="space-y-6 animate-pulse select-none z-10 w-full">
+          {/* Tab Switcher Skeleton */}
+          <div className="grid grid-cols-3 gap-1 bg-slate-50 border border-slate-200/20 p-1.5 rounded-2xl">
+            <div className="h-8 bg-slate-200 rounded-xl" />
+            <div className="h-8 bg-slate-100 rounded-xl" />
+            <div className="h-8 bg-slate-100 rounded-xl" />
+          </div>
 
-      {/* Status Alert Panels */}
-      {(error || success) && (
-        <div className="space-y-2 z-10">
-          {error && (
-            <div className="flex items-start gap-3 p-4 rounded-[20px] bg-red-50 border border-red-100 text-red-700 text-xs shadow-sm">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-500" />
-              <span>{error}</span>
-            </div>
-          )}
-          {success && (
-            <div className="flex items-center gap-2.5 p-4 rounded-[20px] bg-orange-50 border border-orange-100 text-[#FF6B35] text-xs shadow-sm">
-              <span className="w-2 h-2 rounded-full bg-[#FF6B35] animate-pulse" />
-              <span>{success}</span>
-            </div>
-          )}
-        </div>
-      )}
+          {/* Grid of Room Cards Skeleton */}
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="bg-white border border-slate-200/50 rounded-[32px] p-6 shadow-sm flex flex-col justify-between min-h-[160px]">
+                <div className="flex items-start justify-between">
+                  <div className="space-y-3">
+                    <div className="h-4 w-24 bg-slate-200 rounded-full" />
+                    <div className="h-3 w-16 bg-slate-100 rounded-full" />
+                  </div>
+                  <div className="w-8 h-8 rounded-full bg-slate-200" />
+                </div>
+                <div className="flex items-center justify-between mt-6 pt-3 border-t border-slate-50">
+                  <div className="h-3 w-28 bg-slate-200 rounded-full" />
+                  <div className="h-6 w-20 bg-slate-100 rounded-full" />
+                </div>
+              </div>
+            ))}
+          </div>
 
-      {/* C. RESPONSIVE LIGHT-MODE ROOMS GRID */}
-      {filteredRooms.length === 0 ? (
-        <div className="bg-white border border-slate-200/50 rounded-[32px] p-12 text-center flex flex-col items-center justify-center gap-4 flex-1 z-10 shadow-sm">
-          <span className="text-[11px] text-gray-450 font-black tracking-wider uppercase">No appliances found on this floor view.</span>
+          {/* Master Broadcast Bar Skeleton */}
+          <div className="bg-white border border-slate-200/50 rounded-[32px] p-6 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="flex flex-col gap-1.5 w-full sm:w-auto">
+              <div className="h-3 w-32 bg-slate-200 rounded-full" />
+              <div className="h-3 w-56 bg-slate-100 rounded-full" />
+            </div>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <div className="h-10 flex-1 sm:flex-initial sm:w-28 bg-slate-200 rounded-full" />
+              <div className="h-10 flex-1 sm:flex-initial sm:w-28 bg-slate-100 rounded-full" />
+            </div>
+          </div>
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 z-10 pb-36 md:pb-6">
-          {filteredRooms.map((room) => {
-            const isPowerOn = room.acPowered === true || room.power === "on";
-            const displayTemp = (room.currentTemp !== undefined && room.currentTemp !== null && room.currentTemp !== 0)
-              ? (typeof room.currentTemp === 'number' ? room.currentTemp.toFixed(1) : room.currentTemp)
-              : "24.0";
+        <>
+          {/* B. DYNAMIC FILTERS SEGMENT TABS */}
+          <div className="grid grid-cols-3 gap-1 bg-white/70 border border-slate-200/30 p-1.5 rounded-2xl z-10 shadow-sm">
+            <button
+              onClick={() => setActiveTab("all")}
+              className={`py-2 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer ${
+                activeTab === "all"
+                  ? "bg-[#FF6B35] text-white shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              All ({countAll})
+            </button>
+            <button
+              onClick={() => setActiveTab("occupied")}
+              className={`py-2 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer ${
+                activeTab === "occupied"
+                  ? "bg-[#FF6B35] text-white shadow-sm shadow-[#FF6B35]/10"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              Occupied ({countOccupied})
+            </button>
+            <button
+              onClick={() => setActiveTab("vacant")}
+              className={`py-2 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer ${
+                activeTab === "vacant"
+                  ? "bg-[#FF6B35] text-white shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              Vacant ({countVacant})
+            </button>
+          </div>
 
-            return (
-              <Link
-                key={room.roomId}
-                href={`/dashboard/rooms/${room.roomId}`}
-                className="bg-white border border-slate-200/50 rounded-[24px] sm:rounded-[32px] p-4 sm:p-5 flex flex-col justify-between min-h-[110px] sm:min-h-[140px] shadow-sm relative group active:scale-[0.98] transition-all hover:border-[#FF6B35]/40"
-              >
+          {/* Status Alert Panels */}
+          {(error || success) && (
+            <div className="space-y-2 z-10">
+              {error && (
+                <div className="flex items-start gap-3 p-4 rounded-[20px] bg-red-50 border border-red-100 text-red-700 text-xs shadow-sm">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-500" />
+                  <span>{error}</span>
+                </div>
+              )}
+              {success && (
+                <div className="flex items-start gap-3 p-4 rounded-[20px] bg-orange-50 border border-orange-100 text-[#FF6B35] text-xs shadow-sm">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#FF6B35] mt-1.5 shrink-0" />
+                  <span>{success}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* C. ROOMS LIST GRID */}
+          {filteredRooms.length === 0 ? (
+            <div className="bg-white border border-slate-200/50 rounded-[32px] p-8 text-center flex flex-col items-center justify-center gap-4 my-4 shadow-sm z-10">
+              <div className="w-12 h-12 rounded-[20px] bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400">
+                <WifiOff className="w-5 h-5 text-[#FF6B35]" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-sm font-bold text-gray-900 tracking-tight">No Rooms Found</h3>
+                <p className="text-xs text-gray-500 max-w-xs leading-relaxed">
+                  No rooms match the selected tab filter or have been created on this floor yet.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 sm:gap-5 z-10">
+              {filteredRooms.map((room) => {
+                const isOnline = room.deviceStatus === "online";
+                const isPowered = isRoomPowerOn(room);
                 
-                {/* Top left room name & Top right power button */}
-                <div className="flex items-start justify-between w-full">
-                  <span className="text-sm font-extrabold text-gray-800 pl-0.5 pt-0.5 tracking-tight group-hover:text-[#FF6B35] transition-colors truncate">
-                    {room.name || room.roomName}
-                  </span>
-
-                  <button
-                    onClick={(e) => handleQuickToggle(e, room)}
-                    className={`w-8 h-8 rounded-full flex items-center justify-center cursor-pointer transition-all duration-300 border ${
-                      isPowerOn 
-                        ? "bg-[#FF6B35] border-transparent text-white shadow-md shadow-[#FF6B35]/15 active:scale-90" 
-                        : "bg-[#F5F5F7] border-slate-200 text-slate-400 hover:text-slate-600 hover:bg-[#EAEAEA] active:scale-90"
+                return (
+                  <Link 
+                    key={room.roomId}
+                    href={`/dashboard/rooms/${room.roomId}`}
+                    className={`group border rounded-[32px] p-6 shadow-sm hover:shadow-md transition-all duration-300 relative flex flex-col justify-between min-h-[160px] overflow-hidden ${
+                      isOnline 
+                        ? "bg-white hover:bg-slate-50/50 border-slate-200/50" 
+                        : "bg-[#F8F9FA] border-slate-200/50"
                     }`}
                   >
-                    <Power className="w-4 h-4" />
-                  </button>
-                </div>
+                    {isOnline ? (
+                      <>
+                        {/* Glowing highlight indicator */}
+                        <div className={`absolute top-0 right-0 w-2.5 h-2.5 rounded-bl-full transition-colors ${
+                          isPowered ? "bg-[#FF6B35]" : "bg-emerald-500"
+                        }`} />
 
-                {/* Bottom stats layout */}
-                <div className="flex flex-col text-left mt-4 w-full">
-                  {isPowerOn ? (
-                    <>
-                      <span className="text-2xl font-black text-gray-900 leading-none tracking-tight">
-                        {displayTemp}<span className="text-sm font-bold text-gray-400 pl-0.5">°C</span>
-                      </span>
-                      <span className="text-[8.5px] font-black text-[#FF6B35] uppercase tracking-widest mt-2 leading-none">
-                        AC Active
-                      </span>
-                    </>
-                  ) : (
-                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none mt-1 pb-1">
-                      Standby
-                    </span>
-                  )}
-                </div>
+                        <div className="flex items-start justify-between">
+                          <div className="flex flex-col gap-1.5">
+                            <span className="text-xs font-bold text-[#1C1C1E]">
+                              {room.name || room.roomName}
+                            </span>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                              <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">
+                                Online
+                              </span>
+                            </div>
+                          </div>
 
-              </Link>
-            );
-          })}
-        </div>
-      )}
+                          {/* Quick Power Toggle */}
+                          <button
+                            onClick={(e) => handleQuickToggle(e, room)}
+                            disabled={actionLoading}
+                            className={`w-10 h-10 rounded-full flex items-center justify-center border transition-all cursor-pointer active:scale-95 z-20 ${
+                              isPowered 
+                                ? "bg-[#FF6B35]/10 border-[#FF6B35]/25 text-[#FF6B35] hover:bg-[#FF6B35] hover:text-white" 
+                                : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-[#FF6B35] hover:text-white hover:border-[#FF6B35]"
+                            }`}
+                          >
+                            <Power className="w-4 h-4" />
+                          </button>
+                        </div>
 
-      {/* D. STICKY MASTER BROADCAST ACTIONS FOOTER */}
-      {rooms.length > 0 && activeFloor && (
-        <div className="fixed bottom-[68px] left-4 right-4 md:relative md:bottom-auto md:left-auto md:right-auto md:w-full z-20 bg-white/95 backdrop-blur-md border border-slate-200/60 rounded-[24px] p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg md:shadow-sm mt-auto md:mt-4">
-          <div className="flex flex-col text-center sm:text-left">
-            <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Master Floor Control</span>
-            <span className="text-xs font-bold text-gray-700 mt-0.5">Broadcast power commands to all rooms</span>
-          </div>
-          <div className="flex gap-2.5 w-full sm:w-auto">
-            <button
-              onClick={() => handleMasterBroadcast("on")}
-              disabled={actionLoading}
-              className="flex-1 sm:flex-initial px-3 sm:px-5 py-2.5 sm:py-3 bg-[#FF6B35] hover:bg-[#E0531F] disabled:opacity-50 text-white text-[10px] font-black uppercase tracking-widest rounded-full transition-all cursor-pointer shadow-md shadow-[#FF6B35]/15 active:scale-95 text-center"
-            >
-              Turn ON All
-            </button>
-            <button
-              onClick={() => handleMasterBroadcast("off")}
-              disabled={actionLoading}
-              className="flex-1 sm:flex-initial px-3 sm:px-5 py-2.5 sm:py-3 bg-[#F5F5F7] hover:bg-[#EAEAEA] disabled:opacity-50 text-slate-700 text-[10px] font-black uppercase tracking-widest rounded-full border border-slate-200/60 transition-all cursor-pointer active:scale-95 text-center"
-            >
-              Turn OFF All
-            </button>
-          </div>
-        </div>
+                        <div className="flex items-end justify-between mt-6 pt-3 border-t border-slate-50">
+                          {room.deviceId ? (
+                            <div className="flex flex-col items-start gap-1">
+                              <span className="text-[8.5px] font-black text-slate-400 uppercase tracking-widest leading-none">Target Temp</span>
+                              <span className="text-sm font-black text-[#1C1C1E] leading-none tracking-tight">
+                                {room.targetTemp ? `${room.targetTemp}°C` : "—"}
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-start gap-1">
+                              <span className="text-[8px] font-black text-orange-400 uppercase tracking-widest leading-none">Unpaired</span>
+                              <span className="text-[10px] font-black text-slate-655 uppercase tracking-wider font-mono bg-slate-50 border border-slate-200/60 px-2 py-0.5 rounded-lg">
+                                Token: {room.claimToken || "None"}
+                              </span>
+                            </div>
+                          )}
+
+                          <div className="p-2 rounded-xl bg-slate-50 border border-slate-200/30 text-slate-400 group-hover:text-[#FF6B35] group-hover:bg-[#FF6B35]/5 transition-colors">
+                            <Settings className="w-3.5 h-3.5" />
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex items-start justify-between">
+                          <div className="flex flex-col gap-1.5">
+                            <span className="text-xs font-bold text-[#1C1C1E]">
+                              {room.name || room.roomName}
+                            </span>
+                          </div>
+
+                          {/* WifiOff circular badge */}
+                          <div className="w-10 h-10 rounded-full flex items-center justify-center bg-[#FFF0F0] border border-red-100 text-red-500 shadow-sm z-20">
+                            <WifiOff className="w-4 h-4" />
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col text-left mt-auto">
+                          <span className="text-sm font-bold text-red-500">
+                            Offline
+                          </span>
+                          <span className="text-[8.5px] font-black text-slate-450 uppercase tracking-wider mt-0.5">
+                            NOT CONNECTED
+                          </span>
+                        </div>
+                      </>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+
+          {/* D. STICKY MASTER BROADCAST ACTIONS FOOTER */}
+          {rooms.length > 0 && activeFloor && (
+            <div className="fixed bottom-[68px] left-4 right-4 md:relative md:bottom-auto md:left-auto md:right-auto md:w-full z-20 bg-white/95 backdrop-blur-md border border-slate-200/60 rounded-[24px] p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg md:shadow-sm mt-auto md:mt-4">
+              <div className="flex flex-col text-center sm:text-left">
+                <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Master Floor Control</span>
+                <span className="text-xs font-bold text-gray-700 mt-0.5">Broadcast power commands to all rooms</span>
+              </div>
+              <div className="flex gap-2.5 w-full sm:w-auto">
+                <button
+                  onClick={() => handleMasterBroadcast("on")}
+                  disabled={actionLoading}
+                  className="flex-1 sm:flex-initial px-3 sm:px-5 py-2.5 sm:py-3 bg-[#FF6B35] hover:bg-[#E0531F] disabled:opacity-50 text-white text-[10px] font-black uppercase tracking-widest rounded-full transition-all cursor-pointer shadow-md shadow-[#FF6B35]/15 active:scale-95 text-center"
+                >
+                  Turn ON All
+                </button>
+                <button
+                  onClick={() => handleMasterBroadcast("off")}
+                  disabled={actionLoading}
+                  className="flex-1 sm:flex-initial px-3 sm:px-5 py-2.5 sm:py-3 bg-[#F5F5F7] hover:bg-[#EAEAEA] disabled:opacity-50 text-slate-700 text-[10px] font-black uppercase tracking-widest rounded-full border border-slate-200/60 transition-all cursor-pointer active:scale-95 text-center"
+                >
+                  Turn OFF All
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* E. ADD ROOM MODAL */}

@@ -116,9 +116,11 @@ export default function DashboardLayout({ children }) {
   if (loading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F5F5F7] text-slate-800">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-6 h-6 animate-spin text-[#007AFF]" />
-          <p className="text-xs font-semibold text-slate-500">Verifying session...</p>
+        <div className="flex flex-col items-center gap-4 animate-pulse">
+          <div className="w-12 h-12 rounded-2xl bg-[#FF6B35] flex items-center justify-center text-white shadow-lg shadow-[#FF6B35]/20 animate-bounce">
+            <Activity className="w-6 h-6" />
+          </div>
+          <p className="text-[10px] font-black tracking-widest uppercase text-slate-500">Verifying Operator Session...</p>
         </div>
       </div>
     );
