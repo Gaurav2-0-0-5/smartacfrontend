@@ -13,7 +13,12 @@ import {
   ChevronDown,
   Plus,
   X,
-  WifiOff
+  WifiOff,
+  Bluetooth,
+  Wifi,
+  Lock,
+  CheckCircle,
+  Check
 } from "lucide-react";
 import { AC_BRANDS, AC_BRAND_LABELS } from "@/constants/enums";
 
@@ -42,6 +47,16 @@ export default function AllRoomsPage() {
   const [addRoomLoading, setAddRoomLoading] = useState(false);
   const [addRoomError, setAddRoomError] = useState("");
   const [addRoomSuccessToken, setAddRoomSuccessToken] = useState("");
+
+  // BLE auto-provisioning states
+  const [wifiSSID, setWifiSSID] = useState("");
+  const [wifiPassword, setWifiPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [bleStatus, setBleStatus] = useState("idle"); // idle, scanning, connecting, writing, success, error
+  const [bleError, setBleError] = useState("");
+  const [pairedDeviceName, setPairedDeviceName] = useState("");
+  const [showBlePanel, setShowBlePanel] = useState(false);
+  const [isBleSupported, setIsBleSupported] = useState(false);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -167,6 +182,15 @@ export default function AllRoomsPage() {
       window.removeEventListener("activePropertyChange", handleActivePropertyChange);
     };
   }, [fetchAllRooms, getToken, apiUrl]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setWifiSSID(localStorage.getItem("nexaflow_wifi_ssid") || "");
+      if (navigator.bluetooth) {
+        setIsBleSupported(true);
+      }
+    }
+  }, [isAddRoomOpen]);
 
   // Silent Background Polling for Telemetry Updates
   useEffect(() => {
@@ -344,6 +368,77 @@ export default function AllRoomsPage() {
       setAddRoomError(err.message || "An error occurred.");
     } finally {
       setAddRoomLoading(false);
+    }
+  };
+
+  const closeAddRoomModal = () => {
+    setIsAddRoomOpen(false);
+    setAddRoomError("");
+    setAddRoomSuccessToken("");
+    setBleStatus("idle");
+    setBleError("");
+    setPairedDeviceName("");
+    setShowBlePanel(false);
+  };
+
+  const handleBleProvision = async () => {
+    if (!wifiSSID.trim()) {
+      setBleError("Wi-Fi SSID is required.");
+      setBleStatus("error");
+      return;
+    }
+
+    setBleError("");
+    setBleStatus("scanning");
+
+    try {
+      if (!navigator.bluetooth) {
+        throw new Error("Web Bluetooth is not supported on this browser or platform.");
+      }
+
+      console.log("Requesting Bluetooth Device...");
+      const device = await navigator.bluetooth.requestDevice({
+        filters: [
+          { namePrefix: "Nexaflow-" }
+        ],
+        optionalServices: ["4fafc201-1fb5-459e-8fcc-c5c9c331914b"]
+      });
+
+      setPairedDeviceName(device.name || "Nexaflow Device");
+      setBleStatus("connecting");
+
+      const server = await device.gatt.connect();
+
+      setBleStatus("writing");
+      const service = await server.getPrimaryService("4fafc201-1fb5-459e-8fcc-c5c9c331914b");
+
+      const encoder = new TextEncoder();
+
+      // Get characteristics
+      const ssidChar = await service.getCharacteristic("beb5483e-36e1-4688-b7f5-ea07361b26a8");
+      const passChar = await service.getCharacteristic("cba1e984-ab9f-4318-971c-43f147b493b2");
+      const tokenChar = await service.getCharacteristic("dcd2f3a5-b12a-4c28-98e3-54b238a493c3");
+
+      // Write values sequentially
+      await ssidChar.writeValue(encoder.encode(wifiSSID.trim()));
+      await passChar.writeValue(encoder.encode(wifiPassword));
+      await tokenChar.writeValue(encoder.encode(addRoomSuccessToken));
+
+      // Save SSID to cache on success
+      localStorage.setItem("nexaflow_wifi_ssid", wifiSSID.trim());
+
+      setBleStatus("success");
+
+      // Clean disconnect
+      await device.gatt.disconnect();
+    } catch (err) {
+      console.error("BLE Provisioning error:", err);
+      if (err.name === "NotFoundError" || err.message.includes("User cancelled")) {
+        setBleError("Pairing cancelled by user.");
+      } else {
+        setBleError(err.message || "Failed to configure device over Bluetooth.");
+      }
+      setBleStatus("error");
     }
   };
 
@@ -663,109 +758,241 @@ export default function AllRoomsPage() {
           )}
         </>
       )}
-
       {/* E. ADD ROOM MODAL */}
       {isAddRoomOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-[24px] sm:rounded-[32px] border border-slate-200 p-6 max-w-sm w-full animate-fadeIn shadow-2xl relative text-left">
+          <div className="bg-white rounded-[24px] sm:rounded-[32px] border border-slate-200 p-6 max-w-md w-full animate-fadeIn shadow-2xl relative text-left max-h-[90vh] flex flex-col overflow-hidden">
             <button 
-              onClick={() => {
-                setIsAddRoomOpen(false);
-                setAddRoomError("");
-                setAddRoomSuccessToken("");
-              }}
-              className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+              onClick={closeAddRoomModal}
+              className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer z-10"
             >
               <X className="w-4 h-4" />
             </button>
 
-            {addRoomSuccessToken ? (
-              <div className="flex flex-col items-center text-center py-4 space-y-4">
-                <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center border border-green-100">
-                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-sm font-black uppercase tracking-wider text-slate-800">Room Created!</h3>
-                  <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest leading-none mt-1">Use the claim token below to pair your ESP32 device.</p>
-                </div>
-                <div className="bg-slate-50 border border-slate-200/60 rounded-2xl px-6 py-4 w-full">
-                  <span className="text-3xl font-black tracking-widest text-[#FF6B35] font-mono">
-                    {addRoomSuccessToken}
-                  </span>
-                </div>
-                <button
-                  onClick={() => {
-                    setIsAddRoomOpen(false);
-                    setAddRoomSuccessToken("");
-                  }}
-                  className="w-full py-3 bg-[#FF6B35] hover:bg-[#E0531F] text-white text-[11px] font-black uppercase tracking-widest rounded-full transition-all cursor-pointer active:scale-95 text-center shadow-md shadow-[#FF6B35]/15"
-                >
-                  Done
-                </button>
-              </div>
-            ) : (
-              <form onSubmit={handleAddRoom} className="space-y-4">
-                <div className="space-y-1">
-                  <h3 className="text-sm font-black uppercase tracking-wider text-slate-800">Add Room</h3>
-                  <p className="text-[10px] text-slate-450 font-black uppercase tracking-widest">Selected Floor: {activeFloor?.name}</p>
-                </div>
-
-                {addRoomError && (
-                  <div className="flex items-start gap-2.5 p-3.5 rounded-2xl bg-red-50 border border-red-100 text-red-700 text-xs shadow-sm">
-                    <AlertCircle className="w-4 h-4 shrink-0 text-red-500 mt-0.5" />
-                    <span>{addRoomError}</span>
+            <div className="overflow-y-auto flex-1 scrollbar-none mt-2 pr-1">
+              {addRoomSuccessToken ? (
+                <div className="flex flex-col items-center text-center py-2 space-y-5">
+                  <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center border border-green-100 animate-fadeIn">
+                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
                   </div>
-                )}
+                  <div className="space-y-1">
+                    <h3 className="text-sm font-black uppercase tracking-wider text-slate-800">Room Created!</h3>
+                    <p className="text-[10px] text-slate-450 font-black uppercase tracking-widest leading-none mt-1">Use the claim token below to pair your ESP32 device.</p>
+                  </div>
+                  <div className="bg-slate-50 border border-slate-200/60 rounded-2xl px-6 py-4 w-full">
+                    <span className="text-3xl font-black tracking-widest text-[#FF6B35] font-mono">
+                      {addRoomSuccessToken}
+                    </span>
+                  </div>
 
-                <div className="space-y-1.5">
-                  <label className="block text-[8.5px] font-black text-slate-400 uppercase tracking-widest pl-0.5">
-                    Room Name
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={newRoomName}
-                    onChange={(e) => setNewRoomName(e.target.value)}
-                    placeholder="e.g. Suite 302"
-                    className="w-full bg-[#F5F5F7] border border-slate-200/60 text-xs font-bold text-slate-700 rounded-2xl px-4 py-3 focus:outline-none focus:border-[#FF6B35]/50 transition-colors shadow-sm"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="block text-[8.5px] font-black text-slate-400 uppercase tracking-widest pl-0.5">
-                    AC Brand Profile
-                  </label>
-                  <div className="relative">
-                    <select
-                      value={newRoomBrand}
-                      onChange={(e) => setNewRoomBrand(e.target.value)}
-                      className="w-full bg-[#F5F5F7] border border-slate-200/60 text-xs font-bold text-slate-700 rounded-2xl px-4 py-3 focus:outline-none focus:border-[#FF6B35]/50 transition-colors appearance-none cursor-pointer shadow-sm animate-fadeIn"
+                  {/* Bluetooth Provisioning Option */}
+                  <div className="border border-slate-200/60 rounded-[24px] p-4 bg-slate-50 flex flex-col gap-4 w-full text-left animate-fadeIn">
+                    <button
+                      type="button"
+                      onClick={() => setShowBlePanel(!showBlePanel)}
+                      className="flex items-center justify-between w-full text-left focus:outline-none"
                     >
-                      {Object.values(AC_BRANDS).map((brand) => (
-                        <option key={brand} value={brand} className="bg-white text-slate-700">
-                          {AC_BRAND_LABELS[brand] || brand}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-4 text-slate-400">
-                      <ChevronDown className="w-4 h-4" />
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+                          <Bluetooth className="w-4 h-4" />
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-xs font-bold text-slate-800">Bluetooth Auto-Setup</span>
+                          <span className="text-[9px] text-slate-400 font-medium">Send credentials & token instantly</span>
+                        </div>
+                      </div>
+                      <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${showBlePanel ? "rotate-180" : ""}`} />
+                    </button>
+
+                    {showBlePanel && (
+                      <div className="border-t border-slate-200/60 pt-4 flex flex-col gap-4 animate-fadeIn">
+                        {/* Bluetooth capability check */}
+                        {!isBleSupported ? (
+                          <div className="p-3 bg-amber-50 border border-amber-100 rounded-[16px] text-[10px] text-amber-700 leading-normal flex items-start gap-2">
+                            <AlertCircle className="w-4.5 h-4.5 shrink-0 text-amber-500 mt-0.5" />
+                            <span>
+                              Web Bluetooth is not supported by your browser. Please use a Chromium-based browser (Chrome, Edge, Opera) to use BLE pairing.
+                            </span>
+                          </div>
+                        ) : (
+                          <>
+                            <p className="text-[10px] text-slate-500 leading-relaxed text-left pl-1">
+                              Make sure your ESP32 controller is powered on, in **BLE mode** (blinking red rapidly), and near your computer.
+                            </p>
+                            
+                            {/* Inputs for SSID and Password */}
+                            <div className="flex flex-col gap-3">
+                              <div className="flex flex-col gap-1">
+                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-0.5">
+                                  Wi-Fi SSID
+                                </label>
+                                <div className="relative">
+                                  <Wifi className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                  <input
+                                    type="text"
+                                    value={wifiSSID}
+                                    onChange={(e) => setWifiSSID(e.target.value)}
+                                    placeholder="Enter Wi-Fi SSID"
+                                    className="w-full bg-white border border-slate-200/60 text-xs font-bold text-slate-700 rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:border-[#FF6B35]/50 transition-colors"
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="flex flex-col gap-1">
+                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-0.5">
+                                  Wi-Fi Password
+                                </label>
+                                <div className="relative">
+                                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                  <input
+                                    type={showPassword ? "text" : "password"}
+                                    value={wifiPassword}
+                                    onChange={(e) => setWifiPassword(e.target.value)}
+                                    placeholder="Enter Wi-Fi Password"
+                                    className="w-full bg-white border border-slate-200/60 text-xs font-bold text-slate-700 rounded-xl pl-10 pr-10 py-2.5 focus:outline-none focus:border-[#FF6B35]/50 transition-colors"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-bold text-[#FF6B35] hover:opacity-80 focus:outline-none"
+                                  >
+                                    {showPassword ? "HIDE" : "SHOW"}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Status Visual Tracker */}
+                            {bleStatus !== "idle" && (
+                              <div className="bg-white border border-slate-100 rounded-xl p-3 flex flex-col gap-2 shadow-sm">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Pairing Progress</span>
+                                  <span className="text-[10px] font-bold text-blue-600 capitalize">{bleStatus}</span>
+                                </div>
+                                
+                                {/* Step Progress Bars */}
+                                <div className="flex items-center gap-1.5 mt-1">
+                                  <div className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${bleStatus === "scanning" ? "bg-blue-500 animate-pulse" : bleStatus !== "idle" && bleStatus !== "error" ? "bg-blue-500" : "bg-slate-100"}`} />
+                                  <div className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${bleStatus === "connecting" ? "bg-blue-500 animate-pulse" : (bleStatus === "writing" || bleStatus === "success") ? "bg-blue-500" : "bg-slate-100"}`} />
+                                  <div className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${bleStatus === "writing" ? "bg-blue-500 animate-pulse" : bleStatus === "success" ? "bg-blue-500" : "bg-slate-100"}`} />
+                                </div>
+
+                                {/* Status Description Text */}
+                                <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">
+                                  {bleStatus === "scanning" && "Please select your 'Nexaflow-xxxx' device from the browser prompt..."}
+                                  {bleStatus === "connecting" && `Connecting to ${pairedDeviceName}...`}
+                                  {bleStatus === "writing" && "Writing SSID, password, and claim token to device..."}
+                                  {bleStatus === "success" && "Device configured successfully! Releasing connection."}
+                                  {bleStatus === "error" && (
+                                    <span className="text-red-500 font-medium">{bleError}</span>
+                                  )}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Trigger configuration action */}
+                            {bleStatus !== "success" ? (
+                              <button
+                                type="button"
+                                onClick={handleBleProvision}
+                                disabled={bleStatus === "scanning" || bleStatus === "connecting" || bleStatus === "writing"}
+                                className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-[11px] font-black uppercase tracking-widest rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-md shadow-blue-500/15"
+                              >
+                                {(bleStatus === "scanning" || bleStatus === "connecting" || bleStatus === "writing") ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    <span>Configuring Device...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Bluetooth className="w-4 h-4" />
+                                    <span>Configure Device via Bluetooth</span>
+                                  </>
+                                )}
+                              </button>
+                            ) : (
+                              <div className="flex items-center gap-2 text-green-600 text-xs font-bold justify-center bg-green-50 border border-green-100 p-3 rounded-xl w-full">
+                                <Check className="w-4 h-4 text-green-500 shrink-0" />
+                                <span>Credentials Sent Successfully!</span>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={closeAddRoomModal}
+                    className="w-full py-3 bg-[#FF6B35] hover:bg-[#E0531F] text-white text-[11px] font-black uppercase tracking-widest rounded-full transition-all cursor-pointer active:scale-95 text-center shadow-md shadow-[#FF6B35]/15"
+                  >
+                    Done
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleAddRoom} className="space-y-4">
+                  <div className="space-y-1">
+                    <h3 className="text-sm font-black uppercase tracking-wider text-slate-800">Add Room</h3>
+                    <p className="text-[10px] text-slate-450 font-black uppercase tracking-widest">Selected Floor: {activeFloor?.name}</p>
+                  </div>
+
+                  {addRoomError && (
+                    <div className="flex items-start gap-2.5 p-3.5 rounded-2xl bg-red-50 border border-red-100 text-red-705 text-xs shadow-sm leading-relaxed">
+                      <AlertCircle className="w-4 h-4 shrink-0 text-red-500 mt-0.5" />
+                      <span>{addRoomError}</span>
+                    </div>
+                  )}
+
+                  <div className="space-y-1.5">
+                    <label className="block text-[8.5px] font-black text-slate-400 uppercase tracking-widest pl-0.5">
+                      Room Name
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={newRoomName}
+                      onChange={(e) => setNewRoomName(e.target.value)}
+                      placeholder="e.g. Suite 302"
+                      className="w-full bg-[#F5F5F7] border border-slate-200/60 text-xs font-bold text-slate-700 rounded-2xl px-4 py-3 focus:outline-none focus:border-[#FF6B35]/50 transition-colors shadow-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-[8.5px] font-black text-slate-400 uppercase tracking-widest pl-0.5">
+                      AC Brand Profile
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={newRoomBrand}
+                        onChange={(e) => setNewRoomBrand(e.target.value)}
+                        className="w-full bg-[#F5F5F7] border border-slate-200/60 text-xs font-bold text-slate-700 rounded-2xl px-4 py-3 focus:outline-none focus:border-[#FF6B35]/50 transition-colors appearance-none cursor-pointer shadow-sm"
+                      >
+                        {Object.values(AC_BRANDS).map((brand) => (
+                          <option key={brand} value={brand} className="bg-white text-slate-700">
+                            {AC_BRAND_LABELS[brand] || brand}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-4 text-slate-400">
+                        <ChevronDown className="w-4 h-4" />
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <button
-                  type="submit"
-                  disabled={addRoomLoading}
-                  className="w-full py-3 bg-[#FF6B35] hover:bg-[#E0531F] disabled:opacity-50 text-white text-[11px] font-black uppercase tracking-widest rounded-full transition-all cursor-pointer active:scale-95 text-center flex items-center justify-center gap-2 shadow-md shadow-[#FF6B35]/15"
-                >
-                  {addRoomLoading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    "Create Room"
-                  )}
-                </button>
-              </form>
-            )}
+                  <button
+                    type="submit"
+                    disabled={addRoomLoading}
+                    className="w-full py-3 bg-[#FF6B35] hover:bg-[#E0531F] disabled:opacity-50 text-white text-[11px] font-black uppercase tracking-widest rounded-full transition-all cursor-pointer active:scale-95 text-center flex items-center justify-center gap-2 shadow-md shadow-[#FF6B35]/15"
+                  >
+                    {addRoomLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      "Create Room"
+                    )}
+                  </button>
+                </form>
+              )}
+            </div>
           </div>
         </div>
       )}
