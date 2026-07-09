@@ -43,6 +43,13 @@ export const AC_BRANDS = Object.freeze({
   TOSHIBA_AC: 'TOSHIBA_AC',
   MIDEA: 'MIDEA',
   MIDEA24: 'MIDEA24',
+  LLOYD: 'LLOYD',
+  LLOYD_GREE: 'LLOYD_GREE',
+  LLOYD_MIDEA: 'LLOYD_MIDEA',
+  LLOYD_KELON: 'LLOYD_KELON',
+  LLOYD_COOLIX: 'LLOYD_COOLIX',
+  GREE: 'GREE',
+  COOLIX: 'COOLIX',
 });
 
 export const AC_BRAND_LABELS = Object.freeze({
@@ -88,4 +95,11 @@ export const AC_BRAND_LABELS = Object.freeze({
   TOSHIBA_AC: 'Toshiba (Standard)',
   MIDEA: 'Midea (Standard)',
   MIDEA24: 'Midea (24-Bit)',
+  LLOYD: 'Lloyd (Default/Gree)',
+  LLOYD_GREE: 'Lloyd (Gree OEM)',
+  LLOYD_MIDEA: 'Lloyd (Midea OEM)',
+  LLOYD_KELON: 'Lloyd (Kelon OEM)',
+  LLOYD_COOLIX: 'Lloyd (Coolix OEM)',
+  GREE: 'Gree (Standard)',
+  COOLIX: 'Coolix (Standard)',
 });
