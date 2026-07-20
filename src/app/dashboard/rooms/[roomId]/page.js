@@ -58,6 +58,112 @@ export default function RoomControlPage() {
   const [modalError, setModalError] = useState("");
   const [modalSuccess, setModalSuccess] = useState("");
 
+  // Brand detection states & refs
+  const [isDetectingBrand, setIsDetectingBrand] = useState(false);
+  const [detectionStatus, setDetectionStatus] = useState("detecting"); // "detecting" | "success" | "failed"
+  const [detectedBrand, setDetectedBrand] = useState("");
+  const [detectionCountdown, setDetectionCountdown] = useState(30);
+  const detectionTimerRef = useRef(null);
+  const detectionPollIntervalRef = useRef(null);
+
+  const cleanupDetection = useCallback(() => {
+    if (detectionTimerRef.current) {
+      clearInterval(detectionTimerRef.current);
+      detectionTimerRef.current = null;
+    }
+    if (detectionPollIntervalRef.current) {
+      clearInterval(detectionPollIntervalRef.current);
+      detectionPollIntervalRef.current = null;
+    }
+  }, []);
+
+  const handleStartBrandDetection = async () => {
+    setIsDetectingBrand(true);
+    setDetectionStatus("detecting");
+    setDetectionCountdown(30);
+    setModalError("");
+
+    try {
+      const token = await getToken();
+      if (!token) throw new Error("Auth token invalid.");
+
+      // 1. Dispatch learn_brand command with 30s timeout
+      const res = await fetch(`${apiUrl}/api/device/command`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          propertyId: parentPropertyId,
+          roomId: room?.roomId || roomId,
+          deviceId,
+          action: "learn_brand",
+          value: 30
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to initiate brand learning.");
+      }
+
+      // 2. Start countdown timer
+      let remaining = 30;
+      detectionTimerRef.current = setInterval(() => {
+        remaining -= 1;
+        setDetectionCountdown(remaining);
+        if (remaining <= 0) {
+          cleanupDetection();
+          setDetectionStatus("failed");
+        }
+      }, 1000);
+
+      // 3. High-frequency polling (every 1.5s) to check Firestore room brand status
+      detectionPollIntervalRef.current = setInterval(async () => {
+        try {
+          const checkRes = await fetch(
+            `${apiUrl}/api/properties/${parentPropertyId}/floors/${parentFloorId}/rooms`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          if (!checkRes.ok) return;
+          const checkData = await checkRes.json();
+          const roomsList = checkData.rooms || [];
+          const updatedRoom = roomsList.find(r => r.roomId.toLowerCase() === roomId.toLowerCase());
+          if (!updatedRoom) return;
+
+          if (updatedRoom.brandLearnStatus === "success") {
+            cleanupDetection();
+            setDetectedBrand(updatedRoom.acBrand);
+            setEditAcBrand(updatedRoom.acBrand);
+            setSelectedBrand(updatedRoom.acBrand);
+            setDetectionStatus("success");
+          } else if (updatedRoom.brandLearnStatus === "failed") {
+            cleanupDetection();
+            setDetectionStatus("failed");
+          }
+        } catch (e) {
+          console.error("Polling error during brand detection:", e);
+        }
+      }, 1500);
+
+    } catch (err) {
+      console.error("Start brand detection error:", err);
+      cleanupDetection();
+      setIsDetectingBrand(false);
+      setModalError(err.message || "Failed to initiate brand learning.");
+    }
+  };
+
+  const handleCancelDetection = () => {
+    cleanupDetection();
+    setIsDetectingBrand(false);
+  };
+
+  useEffect(() => {
+    return () => cleanupDetection();
+  }, [cleanupDetection]);
+
   // Operational states
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -1100,20 +1206,83 @@ export default function RoomControlPage() {
 
               {/* AC Brand */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-0.5">
-                  AC Brand
-                </label>
-                <select
-                  value={editAcBrand}
-                  onChange={(e) => setEditAcBrand(e.target.value)}
-                  className="bg-[#F5F5F7] border border-slate-200/60 text-slate-905 rounded-2xl p-3 w-full text-xs font-semibold mt-1 focus:outline-none focus:border-[#FF6B35]/50 cursor-pointer"
-                >
-                  {Object.keys(AC_BRANDS).map((b) => (
-                    <option key={b} value={b} className="bg-white text-slate-850">
-                      {AC_BRAND_LABELS[b] || b}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-0.5">
+                    AC Brand
+                  </label>
+                  {deviceId && room?.deviceStatus === "online" && !isDetectingBrand && (
+                    <button
+                      type="button"
+                      onClick={handleStartBrandDetection}
+                      className="text-[9.5px] font-black uppercase text-[#FF6B35] hover:text-[#E0531F] transition-colors cursor-pointer flex items-center gap-1"
+                    >
+                      <Cpu className="w-3 h-3 text-[#FF6B35]" />
+                      Auto-Detect from Remote
+                    </button>
+                  )}
+                </div>
+
+                {isDetectingBrand ? (
+                  <div className="bg-[#F5F5F7] border border-slate-200/60 rounded-2xl p-4 text-center space-y-3 animate-fadeIn mt-1">
+                    <div className="flex flex-col items-center justify-center space-y-2">
+                      <div className="w-10 h-10 rounded-full bg-[#FF6B35]/10 flex items-center justify-center animate-pulse">
+                        <Cpu className="w-5 h-5 text-[#FF6B35]" />
+                      </div>
+                      <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">
+                        {detectionStatus === 'success' ? 'Brand Detected!' : 
+                         detectionStatus === 'failed' ? 'Detection Failed' : 
+                         'Listening for Remote...'}
+                      </h4>
+                      <p className="text-[10.5px] text-slate-500 leading-relaxed max-w-[260px] mx-auto">
+                        {detectionStatus === 'success' ? `Successfully identified AC remote protocol: ${AC_BRAND_LABELS[detectedBrand] || detectedBrand}` :
+                         detectionStatus === 'failed' ? `Could not detect a valid remote protocol. Please ensure you point the original remote directly at the TSOP sensor.` :
+                         `Point your original remote at the Smart AC controller and press any button (Power or Temp).`}
+                      </p>
+                    </div>
+
+                    {detectionStatus === 'detecting' && (
+                      <div className="flex flex-col items-center justify-center space-y-1 pt-1">
+                        <span className="text-2xl font-black text-slate-900 tracking-tighter">{detectionCountdown}s</span>
+                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Waiting for IR signal</span>
+                      </div>
+                    )}
+
+                    <div className="flex gap-2 pt-1">
+                      {detectionStatus === 'detecting' ? (
+                        <button
+                          type="button"
+                          onClick={handleCancelDetection}
+                          className="w-full py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-[10px] font-black uppercase tracking-widest rounded-xl transition-colors cursor-pointer text-center"
+                        >
+                          Cancel
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsDetectingBrand(false);
+                            setDetectionStatus('detecting');
+                          }}
+                          className="w-full py-2 bg-[#FF6B35] hover:bg-[#E0531F] text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-colors cursor-pointer text-center shadow-sm"
+                        >
+                          {detectionStatus === 'success' ? 'Keep Selected Brand' : 'Back to Settings'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <select
+                    value={editAcBrand}
+                    onChange={(e) => setEditAcBrand(e.target.value)}
+                    className="bg-[#F5F5F7] border border-slate-200/60 text-slate-905 rounded-2xl p-3 w-full text-xs font-semibold mt-1 focus:outline-none focus:border-[#FF6B35]/50 cursor-pointer"
+                  >
+                    {Object.keys(AC_BRANDS).map((b) => (
+                      <option key={b} value={b} className="bg-white text-slate-850">
+                        {AC_BRAND_LABELS[b] || b}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               {/* Device Connection Info */}
