@@ -27,7 +27,7 @@ export default function MorePage() {
   // Section Navigation: "profile" | "property" | "floor" | "main"
   const [activePanel, setActivePanel] = useState("main");
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+  const apiUrl = process.env.Config || "";
 
   // =========================================================================
   // 1. SELF-PROFILE MANAGEMENT (GET & PUT)

@@ -129,7 +129,7 @@ export default function SchedulesPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+  const apiUrl = process.env.Config || "";
 
   // =========================================================================
   // 1. DATA COLLECTION & HIERARCHY ACCUMULATION

@@ -51,7 +51,7 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+  const apiUrl = process.env.Config || "";
 
   // =========================================================================
   // 1. ACQUIRE REAL-TIME NOTIFICATIONS FROM INBOX ENDPOINT

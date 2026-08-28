@@ -26,7 +26,7 @@ export default function DashboardLayout({ children }) {
   const [properties, setProperties] = useState([]);
   const [activeProperty, setActiveProperty] = useState(null);
   const [showPropertyDropdown, setShowPropertyDropdown] = useState(false);
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+  const apiUrl = process.env.Config || "";
 
   // Redirect if session is confirmed offline
   useEffect(() => {

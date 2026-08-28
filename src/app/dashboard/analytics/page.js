@@ -51,7 +51,7 @@ export default function AnalyticsPage() {
   const [showTimeDropdown, setShowTimeDropdown] = useState(false);
   const [activePeriod, setActivePeriod] = useState("This Week");
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+  const apiUrl = process.env.Config || "";
 
   // =========================================================================
   // 1. DYNAMIC PROPERTY HIERARCHY LOAD & FIRST PROPERTY EXTRACTION

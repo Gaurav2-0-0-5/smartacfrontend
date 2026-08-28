@@ -81,7 +81,7 @@ export default function AddStaffModal({ isOpen, onClose, onSuccess }) {
         avatarColor: color
       };
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+      const apiUrl = process.env.Config || "";
       const response = await fetch(`${apiUrl}/api/staff/add`, {
         method: "POST",
         headers: {

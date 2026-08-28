@@ -45,7 +45,7 @@ export default function DashboardPage() {
   const [activeFloorForRoom, setActiveFloorForRoom] = useState(null);
   const [tipIndex, setTipIndex] = useState(0);
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+  const apiUrl = process.env.Config || "";
 
   // =========================================================================
   // 1. DATA ACQUISITION & MUTATION

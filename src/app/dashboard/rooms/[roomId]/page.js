@@ -32,7 +32,7 @@ export default function RoomControlPage() {
   const { user, getToken } = useAuth();
   
   const roomId = params.roomId;
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+  const apiUrl = process.env.Config || "";
 
   // Resolved Hierarchy Identifiers
   const [parentPropertyId, setParentPropertyId] = useState(null);

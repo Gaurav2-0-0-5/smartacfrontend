@@ -54,7 +54,7 @@ export default function EditStaffModal({ isOpen, onClose, onSuccess, staffMember
         assignedArea: assignedArea.trim()
       };
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+      const apiUrl = process.env.Config || "";
       const response = await fetch(`${apiUrl}/api/staff/${staffMember.uid}`, {
         method: "PUT",
         headers: {
@@ -95,7 +95,7 @@ export default function EditStaffModal({ isOpen, onClose, onSuccess, staffMember
       const token = await getToken();
       if (!token) throw new Error("Authentication token expired.");
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+      const apiUrl = process.env.Config || "";
       const response = await fetch(`${apiUrl}/api/staff/${staffMember.uid}`, {
         method: "DELETE",
         headers: {

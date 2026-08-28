@@ -39,7 +39,7 @@ export default function CreatePropertyModal({ isOpen, onClose, onSuccess }) {
       const token = await getToken();
       if (!token) throw new Error("Authentication token expired.");
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+      const apiUrl = process.env.Config || "";
       const response = await fetch(`${apiUrl}/api/properties/create`, {
         method: "POST",
         headers: {

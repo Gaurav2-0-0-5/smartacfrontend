@@ -58,7 +58,7 @@ export default function AllRoomsPage() {
   const [showBlePanel, setShowBlePanel] = useState(false);
   const [isBleSupported, setIsBleSupported] = useState(false);
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+  const apiUrl = process.env.Config || "";
 
   // =========================================================================
   // 1. DATA COLLECTION & HIERARCHY ACCUMULATION

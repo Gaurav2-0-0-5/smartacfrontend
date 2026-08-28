@@ -55,7 +55,7 @@ export default function SignupPage() {
     }
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+      const apiUrl = process.env.Config || "";
       
       // 1. Dispatch profile registration to Backend
       const response = await fetch(`${apiUrl}/api/auth/signup`, {

@@ -28,7 +28,7 @@ export default function AddFloorModal({ isOpen, onClose, onSuccess, propertyId }
       const token = await getToken();
       if (!token) throw new Error("Auth token expired.");
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+      const apiUrl = process.env.Config || "";
       const response = await fetch(`${apiUrl}/api/properties/${propertyId}/floors`, {
         method: "POST",
         headers: {
